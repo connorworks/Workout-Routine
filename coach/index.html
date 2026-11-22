@@ -101,6 +101,12 @@ main { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .iname { display: flex; align-items: baseline; gap: 10px; }
 .iname .b { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 7px; padding: 1px 7px; flex: none; }
 .iname .n { font-weight: 700; font-size: 18px; line-height: 1.25; }
+.nmbtn { background: none; border: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.nmbtn .how { font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.nmbtn[aria-expanded="true"] .how { opacity: .6; }
+.cues { margin: 0; padding: 10px 14px 10px 32px; border-radius: 12px; background: var(--sunk); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.4; }
+.cues[hidden] { display: none; }
+.cues li::marker { color: var(--accent); font-weight: 700; }
 .rx { font-family: var(--mono); font-size: 13.5px; color: var(--muted); }
 .cnote { font-size: 14px; background: var(--sunk); border-radius: 10px; padding: 8px 11px; }
 .last { display: flex; justify-content: space-between; gap: 10px; width: 100%; background: none; border: none; padding: 0; text-align: left; font-size: 13px; color: var(--muted); }
@@ -280,7 +286,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "17";
+  var VERSION = "18";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1232,12 +1238,76 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     }
   }
 
+  // How-to steps and form cues: tap an exercise name to see them. First pattern that matches wins,
+  // so specific names come before general ones.
+  var CUES = [
+    [/dead ?bug/i, ["Lie on your back, arms straight up, knees bent at 90° over your hips.", "Press your low back flat into the floor and keep it there.", "Slowly lower the opposite arm and leg toward the floor, exhaling fully.", "Return and switch sides. If your back arches, don't reach as far."]],
+    [/bird ?dog/i, ["On hands and knees, hands under shoulders, knees under hips.", "Reach one arm forward and the opposite leg back until both are straight.", "Hips stay level, like a glass of water is on your back. Pause, return, switch."]],
+    [/hollow (hold|rock)/i, ["Lie on your back and press your low back into the floor.", "Lift your shoulders and legs a few inches off the floor, arms overhead or by your sides.", "Hold the banana shape. Bend your knees to make it easier; never let your back arch."]],
+    [/pallof/i, ["Stand side-on to the cable, handle at chest height, feet shoulder-width.", "Press the handle straight out from your chest and hold 2 seconds.", "Don't let the cable twist you; ribs down, glutes squeezed. Bring it back in and repeat."]],
+    [/woodchop/i, ["Stand side-on to the cable, feet wide, both hands on the handle.", "Rotate through your hips and torso to pull it diagonally across your body.", "Arms stay fairly straight; the turn comes from your core and hips. Control it back."]],
+    [/side plank/i, ["On your side, elbow under your shoulder, feet stacked or staggered.", "Lift your hips so your body is a straight line from head to feet.", "Don't let your hips sag or rotate."]],
+    [/plank/i, ["Elbows under shoulders, body in one straight line.", "Squeeze your glutes and pull your belly button in.", "Don't let your hips sag or pike up."]],
+    [/cable crunch/i, ["Kneel facing the cable, rope held beside your head.", "Curl your ribs toward your hips, rounding your back. Hips stay still.", "Squeeze your abs at the bottom, then return slowly."]],
+    [/reverse crunch/i, ["Lie on your back, knees bent at 90°, hands by your sides.", "Curl your hips off the floor, bringing your knees toward your chest.", "Lower slowly without swinging your legs."]],
+    [/hanging (knee|leg) raise/i, ["Hang from a bar with shoulders engaged; no swinging.", "Curl your knees up toward your chest by tilting your pelvis.", "Lower slowly to a still hang."]],
+    [/ab wheel/i, ["Kneel with the wheel under your shoulders.", "Roll forward slowly, keeping your back flat and abs tight.", "Go only as far as you can without your low back sagging, then pull back with your abs."]],
+    [/turkish get-up/i, ["Eyes on the weight the whole time, arm locked.", "Roll to your elbow, then hand, lift your hips, sweep the leg under, stand.", "Reverse it slowly. Pause in each position."]],
+    [/hip thrust/i, ["Upper back on the bench (or machine pad), feet flat, shins vertical at the top.", "Tuck your chin and ribs, then drive your hips up through your heels.", "Squeeze your glutes hard for 1 second at the top. Don't arch your low back."]],
+    [/bulgarian/i, ["Back foot laces-down on a bench; front foot far enough forward that your shin stays near vertical.", "Drop your back knee straight down, weight in your front heel.", "Drive up through the front foot. Finish all reps on one leg, then switch."]],
+    [/step-up/i, ["Whole foot on the box or bench.", "Stand up by driving through the top leg; don't push off the bottom foot.", "Step down slowly and with control."]],
+    [/reverse lunge/i, ["Stand tall, step one foot back.", "Lower until both knees are about 90°, back knee just above the floor.", "Push through the front heel to return to standing."]],
+    [/walking lunge/i, ["Take a long step forward and lower until both knees are about 90°.", "Front knee tracks over your toes; torso tall.", "Push through the front heel and step straight into the next lunge."]],
+    [/lunge/i, ["Long stride, torso tall.", "Lower until both knees are about 90°.", "Drive through the front heel."]],
+    [/goblet squat/i, ["Hold one dumbbell or kettlebell at your chest, elbows down.", "Feet a little wider than hips, toes slightly out. Sit down between your heels.", "Chest up, knees track over toes. Stand by driving the floor away."]],
+    [/hack squat/i, ["Back flat against the pad, feet shoulder-width in the middle of the platform.", "Lower until your thighs are at least parallel, knees tracking over toes.", "Push through your whole foot; don't lock your knees hard at the top."]],
+    [/leg press/i, ["Feet shoulder-width in the middle of the platform.", "Lower until your knees are around 90°, low back staying on the pad.", "Press through your whole foot; don't lock your knees out hard."]],
+    [/back squat/i, ["Bar on your upper back, big breath in, brace before you unrack.", "Sit down between your heels with knees tracking over your toes.", "Drive the floor away and lead with your chest."]],
+    [/squat/i, ["Brace your core before each rep.", "Sit between your heels, knees track over toes.", "Drive the floor away to stand."]],
+    [/romanian|rdl/i, ["Soft knees; push your hips straight back.", "Keep the weights close, sliding down your thighs.", "Stop when you feel a hamstring stretch with a flat back, then squeeze your glutes to stand."]],
+    [/trap bar/i, ["Stand in the middle, grip the handles in the middle.", "Hips a little higher than a squat, chest up, pull the slack out of the bar.", "Push the floor away and finish tall with your glutes."]],
+    [/power clean/i, ["Bar over mid-foot, shoulders over the bar.", "Push the floor away, then explode through your hips once the bar passes your knees.", "Keep it close; fast elbows, catch high with soft knees."]],
+    [/(lying|seated) leg curl|leg curl/i, ["Line your knees up with the machine's pivot.", "Curl your heels toward your glutes and squeeze.", "Lower slowly; don't let the weight slam."]],
+    [/swing/i, ["Hike the weight back between your legs like a football snap.", "Snap your hips forward to float it to chest height; arms just guide it.", "It's a hip hinge, not a squat or a front raise."]],
+    [/thruster/i, ["Dumbbells at your shoulders, squat down.", "Drive up and use that momentum to press the dumbbells overhead.", "Lower them to your shoulders as you sink into the next squat."]],
+    [/farmer/i, ["Stand tall, shoulders down, ribs over hips.", "Crush the handles.", "Short, quick steps; no swinging."]],
+    [/arnold press/i, ["Start with dumbbells at your chin, palms facing you.", "As you press up, rotate your palms to face forward.", "Reverse the turn on the way down."]],
+    [/shoulder press|db press|overhead press/i, ["Ribs down and glutes tight; don't lean back.", "Press straight up until your arms are locked out by your ears.", "Lower to shoulder height under control."]],
+    [/incline press/i, ["Low incline, shoulder blades back and down.", "Lower to your upper chest, elbows about 45° from your body.", "Press up and slightly in."]],
+    [/chest press/i, ["Seat height so the handles line up with your mid-chest.", "Shoulder blades back against the pad.", "Press out without locking hard, then return slowly."]],
+    [/bench press|flat .*press/i, ["Shoulder blades pinched and down, feet planted.", "Lower to your lower chest with forearms vertical.", "Press back up, same path every rep."]],
+    [/push-up/i, ["Hands under shoulders, body in one straight line.", "Elbows about 45° from your body.", "Chest to the floor, full lockout. Drop to your knees to keep good form."]],
+    [/assisted pull-up/i, ["Kneel or stand on the pad; more assistance makes it easier.", "Start from straight arms, shoulders pulled down.", "Pull your elbows down to your ribs until your chin clears the bar. Lower slowly."]],
+    [/pull-up|chin-up/i, ["Start from a dead hang, shoulders pulled down.", "Drive your elbows to your ribs until your chin clears.", "Lower under control to straight arms."]],
+    [/pulldown/i, ["Sit tall, chest up, slight lean back.", "Pull the bar or handles to your upper chest, elbows down to your ribs.", "Let your arms go all the way up between reps, under control."]],
+    [/chest-supported/i, ["Chest stays on the pad the whole set.", "Drive your elbows back toward your hips; pause and squeeze.", "Let your shoulder blades reach forward at the bottom."]],
+    [/cable row/i, ["Sit tall with a slight knee bend.", "Pull to your belly button, elbows past your torso, shoulder blades squeezed.", "Reach forward at the stretch without rounding your back."]],
+    [/\brow\b/i, ["Flat back, brace your core.", "Pull your elbow back toward your hip, not up to your ear.", "Squeeze your shoulder blade at the top, lower under control."]],
+    [/reverse pec deck|rear-delt|rear delt/i, ["Chest against the pad, handles at shoulder height.", "Sweep your arms out wide in an arc, slight bend in the elbows.", "Squeeze the backs of your shoulders without shrugging."]],
+    [/face pull/i, ["Rope at about eye height.", "Pull toward your forehead with elbows high, pulling the rope apart.", "Pause and squeeze between your shoulder blades."]],
+    [/pull-apart/i, ["Hold the band at shoulder height, arms straight.", "Pull it apart until it touches your chest.", "Squeeze your shoulder blades, then return slowly."]],
+    [/lateral raise/i, ["Slight bend in the elbows; lead with your elbows.", "Raise to shoulder height, no higher.", "No swinging; lower slowly."]],
+    [/pushdown/i, ["Elbows pinned to your sides, slight forward lean.", "Push down until your arms are straight; spread a rope at the bottom.", "Control it back up to about 90°."]],
+    [/overhead .*triceps|triceps extension/i, ["Face away from the cable, elbows forward by your head.", "Straighten your arms overhead without moving your upper arms.", "Get a full stretch behind your head on the way back."]],
+    [/curl/i, ["Elbows pinned to your sides.", "Only your forearms move; no swinging.", "Squeeze at the top, lower slowly."]]
+  ];
+  function cuesFor(name) { for (var i = 0; i < CUES.length; i++) if (CUES[i][0].test(name)) return CUES[i][1]; return null; }
+
   function renderItem(s, it) {
     var box = el("section", "item");
     var nm = el("div", "iname");
     if (it.block) nm.appendChild(el("span", "b", it.block));
-    nm.appendChild(el("span", "n", it.n));
+    var cues = cuesFor(it.n), cbox = null;
+    if (cues) {
+      var nb = el("button", "n nmbtn"); nb.type = "button"; nb.setAttribute("aria-expanded", "false");
+      nb.appendChild(document.createTextNode(it.n + " ")); nb.appendChild(el("span", "how", "How to ▾"));
+      cbox = el("ol", "cues"); cbox.hidden = true;
+      cues.forEach(function (c) { cbox.appendChild(el("li", null, c)); });
+      nb.addEventListener("click", function () { cbox.hidden = !cbox.hidden; nb.setAttribute("aria-expanded", String(!cbox.hidden)); });
+      nm.appendChild(nb);
+    } else nm.appendChild(el("span", "n", it.n));
     box.appendChild(nm);
+    if (cbox) box.appendChild(cbox);
     box.appendChild(el("div", "rx", it.rx));
     if (it.notes) box.appendChild(el("div", "cnote", it.notes));
 
