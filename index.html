@@ -204,6 +204,10 @@ p { margin: 0; }
 .hype { border-radius: 14px; padding: 16px; background: var(--accent); color: var(--accent-ink); }
 .hype-line { font-family: var(--display); font-weight: 800; font-size: 32px; line-height: 1; text-transform: uppercase; text-wrap: balance; letter-spacing: 0.01em; }
 .card.classcard { border-top: 4px solid var(--class); }
+.card.missed { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.mrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.mrow .mt { font-weight: 700; } .mrow .ms { font-size: 13px; color: var(--muted); }
+.mbtn { flex: none; background: var(--sunk); border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; }
 .classcard .pad { gap: 6px; }
 .classcard.big .pad { gap: 12px; }
 .classcard .ck { color: var(--class); }
@@ -434,7 +438,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
 
 /* Move day */
 .move { display: flex; flex-direction: column; gap: 8px; }
-.mvdays { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.mvdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .mvd { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 6px 0; min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); cursor: pointer; font-weight: 700; font-size: 13px; }
 .mvd small { font-family: var(--mono); font-weight: 400; color: var(--muted); font-size: 12px; }
 .mvd[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
@@ -584,7 +588,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "33 · Nov 21";
+  var APP_VERSION = "34 · Nov 22";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1217,8 +1221,8 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     var lg = (typeof drafts !== "undefined" && drafts[docId(w, l)]) || (typeof logs !== "undefined" && logs[docId(w, l)]) || {};
     // A finished session sits on the day it was done; otherwise a manual move wins.
     var m = lg.done && lg.doneAt ? etDate(lg.doneAt) : lg.moved;
-    if (m) { var d = Math.round((parseISO(m) - parseISO(WEEKS[w - 1].start)) / 86400000); if (d >= 0 && d <= 5) return d; }
-    if (lg.moved) { var d2 = Math.round((parseISO(lg.moved) - parseISO(WEEKS[w - 1].start)) / 86400000); if (d2 >= 0 && d2 <= 5) return d2; }
+    if (m) { var d = Math.round((parseISO(m) - parseISO(WEEKS[w - 1].start)) / 86400000); if (d >= 0 && d <= 6) return d; }
+    if (lg.moved) { var d2 = Math.round((parseISO(lg.moved) - parseISO(WEEKS[w - 1].start)) / 86400000); if (d2 >= 0 && d2 <= 6) return d2; }
     return planDay(w, l);
   }
   // The day the plan puts a lift on: the session's own day (0 = Mon ... 5 = Sat), else the lift's usual day.
@@ -1365,6 +1369,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     if (strip.childNodes.length) viewEl.appendChild(strip);
     if (sel) { viewEl.appendChild(renderSession(sel)); return; }
     viewEl.appendChild(hypeCard(te, noLift, classes));
+    var mc = missedCard(te); if (mc) viewEl.appendChild(mc);
     // A day with a class and no lift is a training day, led by the class.
     if (noLift && classes.length) {
       classes.forEach(function (e, i) { viewEl.appendChild(classCard(e, true, i === 0, i === classes.length - 1)); });
@@ -1373,6 +1378,30 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     if (noLift) { viewEl.appendChild(renderRest()); return; }
     classes.forEach(function (e) { viewEl.appendChild(classCard(e, false)); });
     viewEl.appendChild(renderSession(nowPick));
+  }
+
+  // Lifts earlier this week that aren't done yet, each with a button to do it today.
+  function missedCard(te) {
+    if (!te) return null;
+    var w = te.week, idx = Math.round((parseISO(today) - parseISO(WEEKS[w - 1].start)) / 86400000), miss = [];
+    for (var l = 1; l <= 4; l++) {
+      var s = SESS[l][w - 1], id = docId(w, l), lg = currentLog(id), d = liftDayIdx(w, l);
+      if (s && !s.off && d < idx && !lg.done) miss.push({ l: l, id: id, d: d });
+    }
+    if (!miss.length) return null;
+    var card = el("section", "card missed");
+    card.appendChild(el("div", "eyebrow", miss.length === 1 ? "Missed this week" : miss.length + " missed this week"));
+    miss.forEach(function (m) {
+      var row = el("div", "mrow");
+      var t = el("div"); t.appendChild(el("div", "mt", LIFT_META[m.l].label + " · " + LIFT_META[m.l].title));
+      t.appendChild(el("div", "ms", longDay(addDays(parseISO(WEEKS[w - 1].start), m.d))));
+      row.appendChild(t);
+      var b = el("button", "mbtn", "Move to today"); b.type = "button";
+      b.addEventListener("click", function () { editLog(m.id, function (d) { d.moved = today; }, true); nowPick = { week: w, lift: m.l }; sel = null; render(); });
+      row.appendChild(b);
+      card.appendChild(row);
+    });
+    return card;
   }
 
   // Hype banner at the top of Today: one line for the kind of day.
@@ -1769,7 +1798,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     var t = el("button", "linkbtn", fin || cur === def ? "Move to another day" : "Moved to " + DOW[cur] + " · change");
     t.type = "button"; t.setAttribute("aria-expanded", "false");
     var row = el("div", "mvdays"); row.hidden = true;
-    for (var i = 0; i < 6; i++) (function (i) {
+    for (var i = 0; i < 7; i++) (function (i) {
       var dt = addDays(parseISO(w.start), i);
       var b = el("button", "mvd"); b.type = "button";
       b.setAttribute("aria-pressed", String(i === cur));
@@ -1787,7 +1816,15 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       row.appendChild(b);
     })(i);
     t.addEventListener("click", function () { row.hidden = !row.hidden; t.setAttribute("aria-expanded", String(!row.hidden)); });
-    box.appendChild(t); box.appendChild(row);
+    box.appendChild(t);
+    // Not done, and today falls in this lift's week on another day: one tap to do it today.
+    var ti = Math.round((parseISO(today) - parseISO(w.start)) / 86400000);
+    if (!fin && ti >= 0 && ti <= 6 && ti !== cur) {
+      var tb = el("button", "linkbtn", "Move to today"); tb.type = "button";
+      tb.addEventListener("click", function () { editLog(id, function (d) { d.moved = today; }, true); sel = null; nowPick = pick; render(); });
+      box.appendChild(document.createTextNode(" · ")); box.appendChild(tb);
+    }
+    box.appendChild(row);
     return box;
   }
 
