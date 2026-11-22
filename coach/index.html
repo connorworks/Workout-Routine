@@ -245,6 +245,9 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 .rest .l { font-size: 11px; letter-spacing: .12em; font-weight: 600; text-transform: uppercase; opacity: .75; }
 .rest .tm { font-family: var(--mono); font-size: 30px; font-weight: 600; line-height: 1.1; }
 .rest .bt { display: flex; gap: 8px; }
+.holdbtn { width: 100%; margin-top: 4px; height: 48px; border-radius: 14px; border: 1.5px solid var(--accent); background: var(--accent-soft); color: var(--accent); font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+.holdbtn:disabled { border-color: var(--line); background: var(--sunk); color: var(--muted); cursor: default; }
+.rest.hold { background: var(--accent); color: #fff; }
 .rest button { background: none; border: 1px solid currentColor; border-radius: 12px; padding: 9px 14px; font-weight: 700; color: inherit; }
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; background: var(--surface); border-top: 1px solid var(--line);
   display: grid; grid-template-columns: repeat(3, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -286,7 +289,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "18";
+  var VERSION = "19";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -640,7 +643,57 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
   document.getElementById("rest-add").addEventListener("click", function () {
     restEnd = Math.max(restEnd, Date.now()) + 30000; clearInterval(restTick); restTick = setInterval(drawRest, 250); drawRest();
   });
-  document.getElementById("rest-skip").addEventListener("click", function () { clearInterval(restTick); document.getElementById("rest").hidden = true; });
+  document.getElementById("rest-skip").addEventListener("click", function () {
+    if (holdOn) { endHold(false); return; }
+    clearInterval(restTick); document.getElementById("rest").hidden = true;
+  });
+
+  // ---------- Hold timer (timed sets like a 30-sec plank) ----------
+  // phases: [{ t: seconds, l: label }]. Beeps between phases; onDone runs only if it reaches the end.
+  var holdOn = false, holdTick = null, holdDone = null, actx = null;
+  function beep(hi) {
+    try {
+      if (!actx) return;
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.value = hi ? 1175 : 880; g.gain.value = 0.25;
+      o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + (hi ? 0.5 : 0.18));
+    } catch (e) {}
+  }
+  function startHold(phases, onDone) {
+    // The tap that starts it lets the phone play sound.
+    try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.resume) actx.resume(); } catch (e) {}
+    stopRest(); clearInterval(holdTick);
+    holdOn = true; holdDone = onDone;
+    var bar = document.getElementById("rest");
+    bar.classList.add("hold"); bar.hidden = false;
+    document.getElementById("rest-add").hidden = true;
+    document.getElementById("rest-skip").textContent = "Stop";
+    var k = 0, end = 0, last = -1;
+    function next() {
+      if (k >= phases.length) { endHold(true); return; }
+      end = Date.now() + phases[k].t * 1000; last = -1;
+      document.getElementById("rest-l").textContent = phases[k].l;
+      draw();
+    }
+    function draw() {
+      var left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      document.getElementById("rest-t").textContent = Math.floor(left / 60) + ":" + pad(left % 60);
+      if (left !== last && left > 0 && left <= 3) beep(false);
+      last = left;
+      if (!left) { beep(true); if (navigator.vibrate) navigator.vibrate(300); k++; next(); }
+    }
+    holdTick = setInterval(draw, 200);
+    next();
+  }
+  function endHold(finished) {
+    clearInterval(holdTick); holdOn = false;
+    var bar = document.getElementById("rest");
+    bar.classList.remove("hold"); bar.hidden = true;
+    document.getElementById("rest-add").hidden = false;
+    document.getElementById("rest-skip").textContent = "Skip";
+    var cb = holdDone; holdDone = null;
+    if (finished && cb) cb();
+  }
 
   // ---------- Number pad ----------
   var KP = (function () {
@@ -1393,6 +1446,28 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       wrap.appendChild(row);
       paint(i);
     })(i);
+    // Timed sets ("30 sec", "30 sec each"): a button runs the hold and checks the set when it's done.
+    var holdOf = function (p) { var m = /(\d+)\s*(?:sec|s)\b/i.exec((p && p.reps) || ""); return m ? +m[1] : 0; };
+    if (holdOf(it.per[0])) {
+      var hb = el("button", "holdbtn"); hb.type = "button";
+      var nextSet = function () { for (var k = 0; k < it.sets; k++) if (!v.ck[k]) return k; return -1; };
+      var paintHold = function () {
+        var k = nextSet();
+        hb.disabled = k < 0;
+        hb.textContent = k < 0 ? "All sets done" : "▶ Start set " + (k + 1) + " · " + holdOf(it.per[k]) + " sec" + (/each/i.test(it.per[k].reps || "") ? " each side" : "");
+      };
+      hb.addEventListener("click", function () {
+        var k = nextSet(); if (k < 0) return;
+        var t = holdOf(it.per[k]), each = /each/i.test(it.per[k].reps || ""), nm = it.n + " · set " + (k + 1);
+        var ph = [{ t: 3, l: "Get ready · " + nm }];
+        if (each) ph.push({ t: t, l: nm + " · side 1" }, { t: 5, l: "Switch sides" }, { t: t, l: nm + " · side 2" });
+        else ph.push({ t: t, l: nm });
+        startHold(ph, function () { setCheck(k, true); changed(true, k); paintHold(); });
+      });
+      paintHold();
+      var _paint = paint; paint = function (i) { _paint(i); paintHold(); };
+      wrap.appendChild(hb);
+    }
     all.addEventListener("click", function () {
       var on = !rows.every(function (_, i) { return v.ck[i]; });
       rows.forEach(function (_, i) { setCheck(i, on); });
@@ -1540,7 +1615,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
   // version of itself. A new version reloads the page right then, back on the same screen, unless a rest timer
   // or the keypad is up; then it waits for the next time. Logs are saved on the phone, so nothing is lost.
   var newVersion = false, UIKEY = "coach-ui";
-  function busy() { return (restEnd && Date.now() < restEnd + 3000) || document.body.classList.contains("kp-open") || typing(); }
+  function busy() { return holdOn || (restEnd && Date.now() < restEnd + 3000) || document.body.classList.contains("kp-open") || typing(); }
   function checkVersion() {
     if (location.protocol === "file:") return;
     fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" })
