@@ -365,6 +365,8 @@ body.kp-open .timer { bottom: var(--kph, 360px); z-index: 36; }
 input[type="number"], input[type="text"], textarea { font-family: var(--mono); font-size: 16px; color: var(--ink); background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; min-height: 44px; box-sizing: border-box; }
 input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-width: 100%; }
 .finish { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.durrow { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.durrow label { font-weight: 600; color: var(--ink); }
 .finish textarea { width: 100%; min-height: 80px; resize: vertical; font-family: var(--body); }
 .finbtn { width: 100%; min-height: 52px; border-radius: 12px; border: 2px solid var(--ok); background: transparent; color: var(--ok); font-weight: 700; font-size: 17px; cursor: pointer; }
 .finbtn[aria-pressed="true"] { background: var(--ok); color: #FFFFFF; }
@@ -586,7 +588,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "32 · Nov 21";
+  var APP_VERSION = "33 · Nov 21";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1577,8 +1579,27 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     ta.setAttribute("aria-label", "Session notes");
     ta.value = currentLog(id).notes || "";
     ta.addEventListener("input", function () { editLog(id, function (dd) { dd.notes = ta.value; }); });
-    fin.appendChild(ta);
     var done = !!currentLog(id).done;
+    // Editing a finished session: how long it took.
+    if (done) {
+      var dr = el("div", "durrow");
+      var dl = el("label", null, "Session length"); dl.setAttribute("for", "dur-" + id);
+      dr.appendChild(dl);
+      var durSave = function (v) {
+        var n = numOrNull(String(v).replace(/\.$/, ""));
+        if (n == null || n <= 0 || n > 600 || Math.round(n) === currentLog(id).minutes) return;
+        editLog(id, function (dd) { dd.minutes = Math.round(n); }, true);
+      };
+      var di = numInput("w", function () { return { label: "Session length", unit: "Min", decimals: false,
+        onLog: function () { KP.close(); }, onClose: function () { durSave(di.value); } }; });
+      di.id = "dur-" + id;
+      if (currentLog(id).minutes != null) di.value = currentLog(id).minutes;
+      di.addEventListener("change", function () { durSave(di.value); });
+      dr.appendChild(di);
+      dr.appendChild(el("span", null, "min"));
+      fin.appendChild(dr);
+    }
+    fin.appendChild(ta);
     var fb = el("button", "finbtn", done ? "Done editing" : "Finish session");
     fb.type = "button"; fb.id = "done-" + id;
     fb.addEventListener("click", function () {

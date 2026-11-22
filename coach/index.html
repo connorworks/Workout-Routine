@@ -89,6 +89,9 @@ main { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .back { align-self: flex-start; }
 .item { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 /* A superset (B1, B2…) is one connected bubble. */
+.durrow { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.durrow .dl { font-weight: 600; color: var(--ink); }
+.durrow input { width: 88px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-size: 16px; text-align: center; caret-color: transparent; cursor: pointer; }
 .ss { display: flex; flex-direction: column; }
 .ss > .item { border-radius: 0; }
 .ss > .item + .item { border-top: 1px dashed var(--line); }
@@ -277,7 +280,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "16";
+  var VERSION = "17";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -672,7 +675,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     document.addEventListener("pointerdown", function (e) {
       if (!cur) return;
       var t = e.target;
-      if (t.closest && (t.closest("#kp") || t.closest(".srow input") || t.closest("#rest"))) return;
+      if (t.closest && (t.closest("#kp") || t.closest(".srow input") || t.closest(".durrow input") || t.closest("#rest"))) return;
       close();
     }, true);
     window.addEventListener("resize", function () { if (!sheet.hidden) setH(); });
@@ -1189,6 +1192,23 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     ta.addEventListener("input", function () { lg.notes = ta.value; save(LKEY, logs); });
     ta.addEventListener("change", function () { if (lg.status || lg.date) queueSync(s.id); });
     nc.appendChild(ta);
+    // Editing a finished workout: how long it took.
+    if (isDone(s.id)) {
+      var dr = el("div", "durrow");
+      dr.appendChild(el("span", "dl", "Workout length"));
+      var di = el("input"); di.type = "text"; di.readOnly = true; di.inputMode = "none"; di.autocomplete = "off";
+      di.setAttribute("aria-label", "Workout length in minutes");
+      if (lg.minutes != null) di.value = lg.minutes;
+      di.addEventListener("click", function () {
+        KP.open(di, {
+          onInput: function () { var n = parseFloat(di.value); if (isFinite(n) && n > 0 && n <= 600) { lg.minutes = Math.round(n); save(LKEY, logs); } },
+          onLog: function () { KP.close(); }
+        });
+      });
+      dr.appendChild(di);
+      dr.appendChild(el("span", null, "min"));
+      nc.appendChild(dr);
+    }
     viewEl.appendChild(nc);
 
     var fin = el("button", "btn", isDone(s.id) ? "Done editing" : "Finish workout"); fin.type = "button";
