@@ -88,6 +88,13 @@ main { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 
 .back { align-self: flex-start; }
 .item { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+/* A superset (B1, B2…) is one connected bubble. */
+.ss { display: flex; flex-direction: column; }
+.ss > .item { border-radius: 0; }
+.ss > .item + .item { border-top: 1px dashed var(--line); }
+.ss > .item:not(:first-child) { border-top-width: 1px; margin-top: -1px; }
+.ss > .item:first-child { border-radius: 18px 18px 0 0; }
+.ss > .item:last-child { border-radius: 0 0 18px 18px; }
 .iname { display: flex; align-items: baseline; gap: 10px; }
 .iname .b { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 7px; padding: 1px 7px; flex: none; }
 .iname .n { font-weight: 700; font-size: 18px; line-height: 1.25; }
@@ -270,7 +277,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "15";
+  var VERSION = "16";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1165,7 +1172,16 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     if (!isDone(s.id)) head.appendChild(runBox(s));
     if (editing[s.id] || (plan().on && !isDone(s.id) && !isStarted(s.id))) head.appendChild(moveBox(s));
     viewEl.appendChild(head);
-    s.items.forEach(function (it) { viewEl.appendChild(renderItem(s, it)); });
+    // Exercises that share a letter (B1, B2…) are a superset: group them into one bubble.
+    var ssKey = function (it) { var m = /^([A-Za-z]+)\d+$/.exec(String(it.block || "").trim()); return m ? m[1].toUpperCase() : null; };
+    var grp = null, grpKey = null;
+    s.items.forEach(function (it, i) {
+      var k = ssKey(it), nx = s.items[i + 1];
+      if (k && (k === grpKey || (nx && ssKey(nx) === k))) {
+        if (k !== grpKey) { grp = el("div", "ss"); grpKey = k; viewEl.appendChild(grp); }
+        grp.appendChild(renderItem(s, it));
+      } else { grp = null; grpKey = null; viewEl.appendChild(renderItem(s, it)); }
+    });
 
     var nc = el("section", "card");
     nc.appendChild(el("div", "eyebrow", "Notes for " + coachName()));
