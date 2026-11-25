@@ -313,6 +313,7 @@ textarea { min-height: 120px; resize: vertical; }
   function send() {
     var er = document.getElementById("err");
     nextB.disabled = true; nextB.textContent = "Sending…"; er.textContent = "";
+    if (!CFG.scriptUrl) { done(true); return; }   // demo copy: nothing is sent
     fetch(CFG.scriptUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ intake: payload() }) })
       .then(function (r) { return r.json(); })
       .then(function (res) {
@@ -325,7 +326,7 @@ textarea { min-height: 120px; resize: vertical; }
         paintNav();
       });
   }
-  function done() {
+  function done(demo) {
     document.querySelector(".nav").hidden = true;
     document.getElementById("bar").style.width = "100%";
     document.getElementById("count").textContent = "";
@@ -334,6 +335,7 @@ textarea { min-height: 120px; resize: vertical; }
     box.appendChild(el("div", "mark"));
     box.appendChild(el("h1", null, "You're all set"));
     box.appendChild(el("p", "sub", "Thanks" + (A.name ? ", " + String(A.name).split(" ")[0] : "") + ". " + COACH + " has your answers and will reach out with your program."));
+    if (demo) box.appendChild(el("p", "sub", "Demo: nothing was sent."));
     stepEl.appendChild(box);
     A = {};
   }
