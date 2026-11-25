@@ -118,9 +118,9 @@ textarea { min-height: 120px; resize: vertical; }
       opts: ["Get stronger", "Build muscle", "Lose fat", "Better conditioning", "Prep for a sport or event", "Move and feel better"] },
     { id: "exp", kind: "single", k: "experience", title: "How long have you been lifting?",
       opts: [["Brand new", "Never really followed a program"], ["Under a year", ""], ["1–3 years", ""], ["3+ years", "Comfortable with the big lifts"]] },
-    { id: "days", kind: "single", k: "days", cols: "two", title: "How many days a week can you train?",
+    { id: "days", kind: "single", k: "days", cols: "two", title: "How many days a week can you lift?", sub: "Just weight training. Classes, runs and other workouts you already do don't count here.",
       opts: ["2 days", "3 days", "4 days", "5 days", "6 days"] },
-    { id: "pref", kind: "multi", k: "prefDays", cols: "days", title: "Which days usually work?", sub: "Tap every day that could work.",
+    { id: "pref", kind: "multi", k: "prefDays", cols: "days", title: "Which days could you lift?", sub: "Tap every day that could work for a lifting session.",
       opts: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Any"] },
     { id: "len", kind: "single", k: "length", cols: "two", title: "How long can a workout be?",
       opts: ["30 min", "45 min", "60 min", "75+ min"] },
@@ -145,7 +145,7 @@ textarea { min-height: 120px; resize: vertical; }
     { id: "start", kind: "custom", title: "When do you want to start?" },
     { id: "review", kind: "review", title: "Anything else?", sub: "Then check your answers and send." }
   ];
-  var LABELS = { name: "Name", goals: "Goals", experience: "Experience", days: "Days per week", prefDays: "Days that work",
+  var LABELS = { name: "Name", goals: "Goals", experience: "Experience", days: "Lifting days per week", prefDays: "Days that work for lifting",
     length: "Workout length", where: "Where", equipment: "Equipment", lifts: "Comfortable with", bench: "Bench max", squat: "Squat max",
     deadlift: "Deadlift max", clean: "Clean max", conditioning: "Conditioning", cardio: "Cardio", age: "Age", height: "Height", weight: "Weight",
     injuries: "Injuries", love: "Loves", avoid: "Avoid", start: "Start", notes: "Anything else" };
