@@ -112,9 +112,8 @@ textarea { min-height: 120px; resize: vertical; }
   // One screen per step. kind: single (tap one, moves on), multi (tap several), fields (type in), custom.
   var STEPS = [
     { id: "welcome", kind: "welcome" },
-    { id: "you", kind: "fields", title: "First, who are you?", sub: COACH + " will use this to send you your program.",
-      fields: [{ k: "name", label: "Your name", type: "text", auto: "name", req: true },
-               { k: "contact", label: "Phone or email", type: "text", auto: "email", req: true, hint: "Whichever you'd rather be reached at." }] },
+    { id: "you", kind: "fields", title: "What's your first name?", sub: COACH + " will use it to set up your program.",
+      fields: [{ k: "name", label: "First name", type: "text", auto: "given-name", req: true }] },
     { id: "goals", kind: "multi", k: "goals", max: 3, title: "What are you training for?", sub: "Pick up to 3.",
       opts: ["Get stronger", "Build muscle", "Lose fat", "Better conditioning", "Prep for a sport or event", "Move and feel better"] },
     { id: "exp", kind: "single", k: "experience", title: "How long have you been lifting?",
@@ -146,7 +145,7 @@ textarea { min-height: 120px; resize: vertical; }
     { id: "start", kind: "custom", title: "When do you want to start?" },
     { id: "review", kind: "review", title: "Anything else?", sub: "Then check your answers and send." }
   ];
-  var LABELS = { name: "Name", contact: "Contact", goals: "Goals", experience: "Experience", days: "Days per week", prefDays: "Days that work",
+  var LABELS = { name: "Name", goals: "Goals", experience: "Experience", days: "Days per week", prefDays: "Days that work",
     length: "Workout length", where: "Where", equipment: "Equipment", lifts: "Comfortable with", bench: "Bench max", squat: "Squat max",
     deadlift: "Deadlift max", clean: "Clean max", conditioning: "Conditioning", cardio: "Cardio", age: "Age", height: "Height", weight: "Weight",
     injuries: "Injuries", love: "Loves", avoid: "Avoid", start: "Start", notes: "Anything else" };
@@ -294,7 +293,7 @@ textarea { min-height: 120px; resize: vertical; }
 
   function payload() {
     var o = {};
-    ["name", "contact", "goals", "experience", "days", "prefDays", "length", "where", "equipment", "lifts", "bench", "squat", "deadlift", "clean",
+    ["name", "goals", "experience", "days", "prefDays", "length", "where", "equipment", "lifts", "bench", "squat", "deadlift", "clean",
      "conditioning", "cardio", "age", "height", "weight", "love", "avoid", "notes", "website"].forEach(function (k) { if (A[k] != null && A[k] !== "") o[k] = A[k]; });
     o.injuries = A.injYes === "Yes" ? (A.injuries || "Yes") : (A.injYes === "No" ? "None" : "");
     o.start = A.startWhen === "Pick a date" ? (A.startDate || "") : (A.startWhen || "");
@@ -334,7 +333,7 @@ textarea { min-height: 120px; resize: vertical; }
     var box = el("section", "done");
     box.appendChild(el("div", "mark"));
     box.appendChild(el("h1", null, "You're all set"));
-    box.appendChild(el("p", "sub", "Thanks" + (A.name ? ", " + String(A.name).split(" ")[0] : "") + ". " + COACH + " has your answers and will reach out with your program."));
+    box.appendChild(el("p", "sub", "Thanks" + (A.name ? ", " + String(A.name).split(" ")[0] : "") + ". " + COACH + " has your answers and will send you your program."));
     if (demo) box.appendChild(el("p", "sub", "Demo: nothing was sent."));
     stepEl.appendChild(box);
     A = {};
