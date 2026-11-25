@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#EDEFF2">
+<title>Training Intake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Public+Sans:wght@400;500;600;700&display=swap">
+<script>
+/* ==========================================================================
+   SETTINGS. The coach's name, and the Coach App script's web app address (the same one the client links use).
+   ========================================================================== */
+window.INTAKE = {
+  coach: "Connor",
+  scriptUrl: "https://script.google.com/macros/s/AKfycbzllMWhTAAmN5UNEEZvvgodeo8FKh7LyT1R42LgIKYRdNMr3Wzw_i82JACCDCh43wg/exec"
+};
+</script>
+<style>
+:root {
+  --bg: #EDEFF2; --surface: #FFFFFF; --sunk: #F4F5F7; --ink: #14181D; --muted: #5A636F; --line: #D6DBE1;
+  --accent: #1E4FD6; --accent-ink: #FFFFFF; --accent-soft: color-mix(in srgb, #1E4FD6 12%, #FFFFFF);
+  --bad: #B3261E;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1115; --surface: #161A20; --sunk: #1C2128; --ink: #E7EBF0; --muted: #98A2AF; --line: #2A313A;
+    --accent: #7E9BEA; --accent-ink: #0E1115; --accent-soft: color-mix(in srgb, #7E9BEA 16%, #161A20); --bad: #F2B8B5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1115; --surface: #161A20; --sunk: #1C2128; --ink: #E7EBF0; --muted: #98A2AF; --line: #2A313A;
+  --accent: #7E9BEA; --accent-ink: #0E1115; --accent-soft: color-mix(in srgb, #7E9BEA 16%, #161A20); --bad: #F2B8B5;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: "Public Sans", system-ui, -apple-system, sans-serif; font-size: 16px; line-height: 1.45; min-height: 100dvh; -webkit-text-size-adjust: 100%; }
+.wrap { max-width: 560px; margin: 0 auto; padding: max(16px, env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom)); }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0 14px; }
+.brand { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; margin-bottom: 22px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s ease; }
+h1 { font-family: "Big Shoulders Display", "Public Sans", sans-serif; font-weight: 800; font-size: 40px; line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 10px; text-wrap: balance; }
+h2 { font-size: 24px; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+.lab { display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; }
+.opts { display: grid; gap: 10px; }
+.opts.two { grid-template-columns: 1fr 1fr; }
+.opts.days { grid-template-columns: repeat(4, 1fr); }
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 56px; padding: 14px 16px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 600; text-align: left; cursor: pointer; transition: border-color .12s, background .12s; }
+.opt small { display: block; font-weight: 400; color: var(--muted); font-size: 14px; margin-top: 2px; }
+.opt .tick { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; }
+.opt.multi .tick { border-radius: 6px; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.opt[aria-pressed="true"] .tick { background: var(--accent); border-color: var(--accent); }
+.opt[aria-pressed="true"] .tick::after { content: ""; width: 10px; height: 6px; border: 2.5px solid var(--accent-ink); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.opts.days .opt { justify-content: center; text-align: center; padding: 12px 6px; }
+.opts.days .opt .tick { display: none; }
+.opt:focus-visible, input:focus-visible, textarea:focus-visible, .btn:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+input[type=text], input[type=email], input[type=tel], input[type=date], input[inputmode=numeric], textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; padding: 14px 16px; min-height: 54px; }
+textarea { min-height: 120px; resize: vertical; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field small { display: block; color: var(--muted); font-size: 13px; margin: 6px 2px 0; }
+.err { color: var(--bad); font-size: 14px; font-weight: 600; margin-top: 12px; min-height: 1em; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.nav { position: fixed; left: 0; right: 0; bottom: 0; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+.nav .in { max-width: 560px; margin: 0 auto; display: flex; gap: 10px; }
+.btn { flex: 1; min-height: 54px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; font-size: 17px; cursor: pointer; }
+.btn.go { flex: 2; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn[hidden] { display: none; }
+.review { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px; margin-top: 18px; }
+.review div { display: grid; grid-template-columns: 9.5em 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.review div:first-child { border-top: 0; }
+.review dt { color: var(--muted); font-weight: 600; margin: 0; }
+.review dd { margin: 0; overflow-wrap: anywhere; }
+.done { text-align: center; padding-top: 12vh; }
+.done .mark { width: 72px; height: 72px; border-radius: 50%; background: var(--accent); margin: 0 auto 22px; display: grid; place-items: center; }
+.done .mark::after { content: ""; width: 26px; height: 14px; border: 5px solid var(--accent-ink); border-top: 0; border-right: 0; transform: translateY(-3px) rotate(-45deg); }
+.welcome li { margin: 6px 0; }
+.welcome ul { padding-left: 20px; color: var(--muted); }
+@media (max-width: 360px) { .opts.two { grid-template-columns: 1fr; } h1 { font-size: 34px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><span class="brand" id="brand"></span><span class="count" id="count"></span></header>
+  <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+  <main id="step" aria-live="polite"></main>
+</div>
+<nav class="nav"><div class="in">
+  <button type="button" class="btn" id="back">Back</button>
+  <button type="button" class="btn go" id="next">Next</button>
+</div></nav>
+
+<script>
+(function () {
+  "use strict";
+  var CFG = window.INTAKE || {};
+  var COACH = CFG.coach || "your coach";
+  document.getElementById("brand").textContent = COACH + " · Training intake";
+  var DRAFT = "intake-draft-v1";
+  var A = {};
+  try { A = JSON.parse(localStorage.getItem(DRAFT) || "{}") || {}; } catch (e) { A = {}; }
+  function save() { try { localStorage.setItem(DRAFT, JSON.stringify(A)); } catch (e) {} }
+
+  // One screen per step. kind: single (tap one, moves on), multi (tap several), fields (type in), custom.
+  var STEPS = [
+    { id: "welcome", kind: "welcome" },
+    { id: "you", kind: "fields", title: "First, who are you?", sub: COACH + " will use this to send you your program.",
+      fields: [{ k: "name", label: "Your name", type: "text", auto: "name", req: true },
+               { k: "contact", label: "Phone or email", type: "text", auto: "email", req: true, hint: "Whichever you'd rather be reached at." }] },
+    { id: "goals", kind: "multi", k: "goals", max: 3, title: "What are you training for?", sub: "Pick up to 3.",
+      opts: ["Get stronger", "Build muscle", "Lose fat", "Better conditioning", "Prep for a sport or event", "Move and feel better"] },
+    { id: "exp", kind: "single", k: "experience", title: "How long have you been lifting?",
+      opts: [["Brand new", "Never really followed a program"], ["Under a year", ""], ["1–3 years", ""], ["3+ years", "Comfortable with the big lifts"]] },
+    { id: "days", kind: "single", k: "days", cols: "two", title: "How many days a week can you train?",
+      opts: ["2 days", "3 days", "4 days", "5 days", "6 days"] },
+    { id: "pref", kind: "multi", k: "prefDays", cols: "days", title: "Which days usually work?", sub: "Tap every day that could work.",
+      opts: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Any"] },
+    { id: "len", kind: "single", k: "length", cols: "two", title: "How long can a workout be?",
+      opts: ["30 min", "45 min", "60 min", "75+ min"] },
+    { id: "where", kind: "single", k: "where", title: "Where will you train most?",
+      opts: [["Full commercial gym", "Racks, machines, cables, dumbbells"], ["Small or apartment gym", "Some dumbbells, a machine or two"], ["Home gym", ""], ["Mix of places / I travel a lot", ""]] },
+    { id: "equip", kind: "multi", k: "equipment", title: "What equipment do you have?", sub: "Tap all that you can use.",
+      opts: ["Barbell and squat rack", "Dumbbells", "Cable machine", "Weight machines", "Kettlebells", "Adjustable bench", "Pull-up bar", "Bands", "Cardio machines", "Not sure"] },
+    { id: "lifts", kind: "multi", k: "lifts", title: "Which of these are you comfortable doing?", sub: "No wrong answers. This sets where we start.",
+      opts: ["Squat", "Deadlift", "Bench press", "Overhead press", "Pull-ups", "Olympic lifts (cleans)", "None of these yet"] },
+    { id: "maxes", kind: "fields", optional: true, title: "Know any of your maxes?", sub: "Your best single rep, in lb. Skip any you don't know.",
+      grid: true, fields: [{ k: "bench", label: "Bench", num: true }, { k: "squat", label: "Squat", num: true },
+                           { k: "deadlift", label: "Deadlift", num: true }, { k: "clean", label: "Power clean", num: true }] },
+    { id: "cond", kind: "single", k: "conditioning", title: "How do you feel about conditioning?", sub: "Sprints, circuits and finishers at the end of a lift.",
+      opts: [["Love it", "Make me sweat"], ["Some is fine", ""], ["Keep it short", ""], ["Skip it", "I do my cardio separately"]] },
+    { id: "cardio", kind: "multi", k: "cardio", cols: "two", optional: true, title: "Any cardio you enjoy?", sub: "Optional. Tap any.",
+      opts: ["Running", "Bike", "Rower", "Elliptical", "Stairs", "Swimming", "Classes", "None"] },
+    { id: "body", kind: "custom", optional: true, title: "A little about you", sub: "Optional. It helps pick starting weights." },
+    { id: "inj", kind: "custom", title: "Any injuries or pain to work around?" },
+    { id: "likes", kind: "fields", optional: true, title: "Favorites and no-gos", sub: "Optional.",
+      fields: [{ k: "love", label: "Exercises you love", type: "area", hint: "e.g. hip thrusts, pull-ups, anything with a sled" },
+               { k: "avoid", label: "Exercises you want to avoid", type: "area", hint: "e.g. burpees, running, overhead work" }] },
+    { id: "start", kind: "custom", title: "When do you want to start?" },
+    { id: "review", kind: "review", title: "Anything else?", sub: "Then check your answers and send." }
+  ];
+  var LABELS = { name: "Name", contact: "Contact", goals: "Goals", experience: "Experience", days: "Days per week", prefDays: "Days that work",
+    length: "Workout length", where: "Where", equipment: "Equipment", lifts: "Comfortable with", bench: "Bench max", squat: "Squat max",
+    deadlift: "Deadlift max", clean: "Clean max", conditioning: "Conditioning", cardio: "Cardio", age: "Age", height: "Height", weight: "Weight",
+    injuries: "Injuries", love: "Loves", avoid: "Avoid", start: "Start", notes: "Anything else" };
+
+  var i = 0;
+  try { var si = +sessionStorage.getItem("intake-step"); if (si > 0 && si < STEPS.length) i = si; } catch (e) {}
+  var stepEl = document.getElementById("step"), backB = document.getElementById("back"), nextB = document.getElementById("next");
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function arr(k) { return Array.isArray(A[k]) ? A[k] : []; }
+
+  function optButton(label, small, multi, on, click) {
+    var b = el("button", "opt" + (multi ? " multi" : "")); b.type = "button";
+    b.setAttribute("aria-pressed", String(!!on));
+    var t = el("span"); t.appendChild(document.createTextNode(label)); if (small) t.appendChild(el("small", null, small));
+    b.appendChild(t); b.appendChild(el("span", "tick"));
+    b.addEventListener("click", click);
+    return b;
+  }
+  function single(box, k, opts, cols, onPick) {
+    var g = el("div", "opts" + (cols ? " " + cols : ""));
+    opts.forEach(function (o) {
+      var label = Array.isArray(o) ? o[0] : o, small = Array.isArray(o) ? o[1] : "";
+      g.appendChild(optButton(label, small, false, A[k] === label, function () {
+        A[k] = label; save(); render();
+        if (onPick) onPick(label); else setTimeout(go, 180);
+      }));
+    });
+    box.appendChild(g);
+  }
+  function multi(box, k, opts, cols, max) {
+    var g = el("div", "opts" + (cols ? " " + cols : ""));
+    var none = /^(none|not sure|any)/i;
+    opts.forEach(function (label) {
+      g.appendChild(optButton(label, "", true, arr(k).indexOf(label) >= 0, function () {
+        var v = arr(k).slice(), at = v.indexOf(label);
+        if (at >= 0) v.splice(at, 1);
+        else {
+          if (none.test(label)) v = [];
+          else v = v.filter(function (x) { return !none.test(x); });
+          if (max && v.length >= max) v.shift();
+          v.push(label);
+        }
+        A[k] = v; save(); render();
+      }));
+    });
+    box.appendChild(g);
+  }
+  function field(box, f) {
+    var w = el("div", "field");
+    var l = el("label", "lab", f.label); l.htmlFor = "f-" + f.k; w.appendChild(l);
+    var inp = f.type === "area" ? el("textarea") : el("input");
+    inp.id = "f-" + f.k;
+    if (f.type !== "area") inp.type = f.type === "date" ? "date" : "text";
+    if (f.num) { inp.inputMode = "numeric"; inp.pattern = "[0-9]*"; inp.placeholder = "lb"; }
+    if (f.auto) inp.autocomplete = f.auto;
+    if (f.place) inp.placeholder = f.place;
+    inp.value = A[f.k] || "";
+    inp.addEventListener("input", function () { A[f.k] = f.num ? inp.value.replace(/[^0-9]/g, "") : inp.value; if (f.num && inp.value !== A[f.k]) inp.value = A[f.k]; save(); paintNav(); });
+    w.appendChild(inp);
+    if (f.hint) w.appendChild(el("small", null, f.hint));
+    box.appendChild(w);
+    return inp;
+  }
+
+  function valid(s) {
+    if (s.kind === "fields") return s.fields.every(function (f) { return !f.req || String(A[f.k] || "").trim(); });
+    if (s.kind === "single") return !!A[s.k];
+    if (s.kind === "multi") return s.optional || arr(s.k).length > 0;
+    if (s.id === "inj") return A.injYes === "No" || (A.injYes === "Yes" && String(A.injuries || "").trim());
+    if (s.id === "start") return A.startWhen && (A.startWhen !== "Pick a date" || A.startDate);
+    return true;
+  }
+
+  function render() {
+    var s = STEPS[i];
+    stepEl.textContent = "";
+    var box = el("section");
+    if (s.kind === "welcome") {
+      box.className = "welcome";
+      box.appendChild(el("h1", null, "Let's build your program"));
+      box.appendChild(el("p", "sub", "A few quick questions, mostly taps, about 3 minutes. " + COACH + " uses your answers to write a program that fits your goals, schedule and gym."));
+      var ul = el("ul");
+      ["Your goals and experience", "When and where you train", "Anything to work around"].forEach(function (t) { ul.appendChild(el("li", null, t)); });
+      box.appendChild(ul);
+    } else {
+      box.appendChild(el("h2", null, s.title));
+      if (s.sub) box.appendChild(el("p", "sub", s.sub));
+      if (s.kind === "single") single(box, s.k, s.opts, s.cols);
+      if (s.kind === "multi") multi(box, s.k, s.opts, s.cols, s.max);
+      if (s.kind === "fields") {
+        var host = box;
+        if (s.grid) { host = el("div", "grid2"); box.appendChild(host); }
+        s.fields.forEach(function (f) { field(host, f); });
+        if (s.id === "you") { var hp = el("input", "hp"); hp.type = "text"; hp.tabIndex = -1; hp.autocomplete = "off"; hp.name = "website"; hp.setAttribute("aria-hidden", "true"); hp.addEventListener("input", function () { A.website = hp.value; }); box.appendChild(hp); }
+      }
+      if (s.id === "body") {
+        box.appendChild(el("span", "lab", "Age"));
+        single(box, "age", ["Under 20", "20s", "30s", "40s", "50s", "60+"], "two", function () {});
+        var g = el("div", "grid2"); box.appendChild(g);
+        field(g, { k: "height", label: "Height", place: "5'10\"" });
+        field(g, { k: "weight", label: "Weight", place: "lb" });
+      }
+      if (s.id === "inj") {
+        single(box, "injYes", [["No", "Nothing to work around"], ["Yes", "Tell me below"]], "two", function () {});
+        if (A.injYes === "Yes") { var t = field(box, { k: "injuries", label: "What should " + COACH + " know?", type: "area", hint: "Where it hurts, what makes it worse, anything a doctor or PT told you." }); setTimeout(function () { t.focus(); }, 50); }
+      }
+      if (s.id === "start") {
+        single(box, "startWhen", ["As soon as possible", "Next week", "Pick a date"], null, function (v) { if (v !== "Pick a date") setTimeout(go, 180); });
+        if (A.startWhen === "Pick a date") field(box, { k: "startDate", label: "Start date", type: "date" });
+      }
+      if (s.kind === "review") {
+        field(box, { k: "notes", label: "Anything else " + COACH + " should know", type: "area", hint: "Optional. Schedule quirks, travel, what's worked or hasn't." });
+        var dl = el("dl", "review");
+        var out = payload();
+        Object.keys(LABELS).forEach(function (k) {
+          var v = out[k]; if (Array.isArray(v)) v = v.join(", ");
+          if (!v || k === "notes") return;
+          var row = el("div"); row.appendChild(el("dt", null, LABELS[k])); row.appendChild(el("dd", null, String(v))); dl.appendChild(row);
+        });
+        box.appendChild(el("span", "lab", "Your answers"));
+        box.appendChild(dl);
+        var er = el("div", "err"); er.id = "err"; box.appendChild(er);
+      }
+    }
+    stepEl.appendChild(box);
+    paintNav();
+    try { sessionStorage.setItem("intake-step", String(i)); } catch (e) {}
+  }
+
+  function paintNav() {
+    var s = STEPS[i], n = STEPS.length - 1;
+    document.getElementById("bar").style.width = (i / n * 100) + "%";
+    document.getElementById("count").textContent = i ? i + " of " + n : "";
+    backB.hidden = i === 0;
+    nextB.textContent = s.kind === "welcome" ? "Start" : s.kind === "review" ? "Send to " + COACH : (s.optional && !hasAny(s) ? "Skip" : "Next");
+    nextB.disabled = !valid(s);
+  }
+  function hasAny(s) {
+    if (s.kind === "multi") return arr(s.k).length > 0;
+    if (s.kind === "fields") return s.fields.some(function (f) { return String(A[f.k] || "").trim(); });
+    if (s.id === "body") return !!(A.age || A.height || A.weight);
+    return true;
+  }
+
+  function payload() {
+    var o = {};
+    ["name", "contact", "goals", "experience", "days", "prefDays", "length", "where", "equipment", "lifts", "bench", "squat", "deadlift", "clean",
+     "conditioning", "cardio", "age", "height", "weight", "love", "avoid", "notes", "website"].forEach(function (k) { if (A[k] != null && A[k] !== "") o[k] = A[k]; });
+    o.injuries = A.injYes === "Yes" ? (A.injuries || "Yes") : (A.injYes === "No" ? "None" : "");
+    o.start = A.startWhen === "Pick a date" ? (A.startDate || "") : (A.startWhen || "");
+    return o;
+  }
+
+  function go() {
+    var s = STEPS[i];
+    if (!valid(s)) return;
+    if (s.kind === "review") { send(); return; }
+    i = Math.min(STEPS.length - 1, i + 1); render(); window.scrollTo(0, 0);
+  }
+  backB.addEventListener("click", function () { if (i > 0) { i--; render(); window.scrollTo(0, 0); } });
+  nextB.addEventListener("click", go);
+
+  function send() {
+    var er = document.getElementById("err");
+    nextB.disabled = true; nextB.textContent = "Sending…"; er.textContent = "";
+    fetch(CFG.scriptUrl, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ intake: payload() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res || !res.ok) throw new Error(res && res.error || "failed");
+        try { localStorage.removeItem(DRAFT); sessionStorage.removeItem("intake-step"); } catch (e) {}
+        done();
+      })
+      .catch(function () {
+        er.textContent = "That didn't send. Check your connection and try again. Your answers are saved on this phone.";
+        paintNav();
+      });
+  }
+  function done() {
+    document.querySelector(".nav").hidden = true;
+    document.getElementById("bar").style.width = "100%";
+    document.getElementById("count").textContent = "";
+    stepEl.textContent = "";
+    var box = el("section", "done");
+    box.appendChild(el("div", "mark"));
+    box.appendChild(el("h1", null, "You're all set"));
+    box.appendChild(el("p", "sub", "Thanks" + (A.name ? ", " + String(A.name).split(" ")[0] : "") + ". " + COACH + " has your answers and will reach out with your program."));
+    stepEl.appendChild(box);
+    A = {};
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
