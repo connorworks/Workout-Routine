@@ -1,9 +1,9 @@
-// Workout Routine sync (starter kit, from v5).
+// Workout Routine sync (starter kit, from v6).
 // Paste this into your Sheet's Apps Script editor (Extensions > Apps Script), set PASSCODE, then deploy
 // as a web app: Execute as Me, Who has access Anyone. See README.md in the starter folder.
 // Receives sessions from the Workout Routine app and writes them to this Sheet,
 // sends the app its program from the Program, Program · Weeks and Program · Lifts tabs,
-// and keeps training maxes on the Maxes tab in step with the app.
+// keeps training maxes on the Maxes tab in step with the app, and logs runs on the Running tab.
 // Rows are matched on Block + Session ID, so re-sending a session updates it instead of duplicating it.
 
 // The passcode you type into the app. Pick your own and keep the quotes.
@@ -28,7 +28,9 @@ function doPost(e) {
     sessions.forEach(function (s) { writeSession(ss, s); });
     weights.forEach(function (b) { writeBodyweight(ss, b); });
     if (Array.isArray(body.maxes)) writeMaxes(ss, body.maxes);
-    return reply({ ok: true, sessions: sessions.length, bodyweight: weights.length });
+    const runs = body.runs || [];
+    runs.forEach(function (r) { writeRun(ss, r); });
+    return reply({ ok: true, sessions: sessions.length, bodyweight: weights.length, runs: runs.length });
   } catch (err) {
     return reply({ ok: false, error: String(err) });
   } finally {
@@ -54,7 +56,8 @@ function doGet(e) {
     ok: true,
     sessions: readBlock(ss, 'Sessions', block, 11),
     sets: readBlock(ss, 'Sets', block, 12),
-    bodyweight: readBlock(ss, 'Bodyweight', block, 4)
+    bodyweight: readBlock(ss, 'Bodyweight', block, 4),
+    runs: readRuns(ss)
   });
 }
 
@@ -109,6 +112,35 @@ function writeMaxes(ss, m) {
     if (isFinite(tm) && tm > 0 && Number(sh.getRange(r, cTm).getValue()) !== tm) { sh.getRange(r, cTm).setValue(tm); if (cAt) sh.getRange(r, cAt).setValue(now); }
     if (cOne && isFinite(one) && one > 0 && Number(sh.getRange(r, cOne).getValue()) !== one) { sh.getRange(r, cOne).setValue(one); if (cAt) sh.getRange(r, cAt).setValue(now); }
   });
+}
+
+// One run. r = { id, block, date, mi, time, pace, deleted }. Matched on Run ID; a deleted run's row is removed.
+function writeRun(ss, r) {
+  let sh = ss.getSheetByName('Running');
+  if (!sh) {
+    sh = ss.insertSheet('Running');
+    sh.getRange(1, 1, 1, 7).setValues([['Block', 'Run ID', 'Date', 'Distance (mi)', 'Time', 'Pace (/mi)', 'Logged']]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    sh.getRange('E:F').setNumberFormat('@'); // keep 28:30 as text, not a clock time
+  }
+  const id = String(r.id || ''); if (!id) return;
+  const last = sh.getLastRow();
+  const ids = last > 1 ? sh.getRange(2, 2, last - 1, 1).getValues().map(function (x) { return String(x[0]); }) : [];
+  const at = ids.indexOf(id) + 2;
+  if (r.deleted) { if (at >= 2) sh.deleteRow(at); return; }
+  const tz = ss.getSpreadsheetTimeZone();
+  const row = [String(r.block || ''), id, String(r.date || ''), Number(r.mi) || 0, String(r.time || ''), String(r.pace || ''), Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm')];
+  const target = at >= 2 ? at : last + 1;
+  sh.getRange(target, 5, 1, 2).setNumberFormat('@');
+  sh.getRange(target, 1, 1, row.length).setValues([row]);
+}
+
+// Every run, any block: [Block, Run ID, Date, Distance, Time].
+function readRuns(ss) {
+  const sh = ss.getSheetByName('Running');
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 5).getDisplayValues()
+    .filter(function (r) { return r[1]; });
 }
 
 function reply(obj) {

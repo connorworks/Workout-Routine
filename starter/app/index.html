@@ -52,7 +52,7 @@ window.STARTER_PROGRAM = {"program": [["Week", "Lift", "Block", "Block name", "R
 (function () {
   if (window.claude) return;
   var KEY = "ptb-db-v1";
-  var SEED = { logs: {}, bodyweight: {} }; // History lives in the Google Sheet; a new device starts empty.
+  var SEED = { logs: {}, bodyweight: {}, runs: {} }; // History lives in the Google Sheet; a new device starts empty.
   var data;
   try { data = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   if (!data) { data = SEED; save(); }
@@ -173,6 +173,13 @@ p { margin: 0; }
 .syncdlg-in p.err { color: var(--test); }
 .syncdlg-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .syncdlg-btns button { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); font-weight: 700; font-size: 16px; cursor: pointer; }
+.runbtn { width: 100%; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font-weight: 700; font-size: 16px; cursor: pointer; margin-top: 4px; }
+.runf { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 700; }
+.runin { display: flex; align-items: center; gap: 6px; }
+.syncdlg-in .runin input { width: 64px; text-align: right; font-family: var(--mono); font-size: 18px; }
+.runrow { cursor: default; align-items: center; }
+.rundel { border: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 4px 0 4px 8px; }
+.rundel[data-c] { color: var(--test); font-weight: 700; }
 .syncdlg-btns .go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
 .app { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px calc(150px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; }
@@ -490,7 +497,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
 .status.away { color: var(--travel); border: 1px dashed var(--travel); }
 
 /* Maxes */
-.tmrow { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; font-size: 15px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.tmrow { display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; font-size: 15px; padding: 10px 16px; border-top: 1px solid var(--line); }
 .tmrow .mono { text-align: right; }
 .tmrow { align-items: center; }
 .tmcell { display: inline-flex; align-items: center; gap: 6px; justify-self: end; }
@@ -522,6 +529,20 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     <div class="syncdlg-btns">
       <button type="button" id="syncdlg-cancel">Cancel</button>
       <button type="button" id="syncdlg-save" class="go">Connect</button>
+    </div>
+  </div>
+</div>
+
+<div class="syncdlg" id="rundlg" hidden role="dialog" aria-modal="true" aria-labelledby="rundlg-t">
+  <div class="syncdlg-in">
+    <h3 id="rundlg-t">Add a run</h3>
+    <p class="muted" id="run-date"></p>
+    <label class="runf"><span>Distance</span><span class="runin"><input type="text" inputmode="decimal" id="run-mi" placeholder="3.1" autocomplete="off"><span class="muted">mi</span></span></label>
+    <div class="runf"><span>Time</span><span class="runin"><input type="text" inputmode="numeric" id="run-min" placeholder="28" aria-label="Minutes" autocomplete="off"><span class="muted">min</span><input type="text" inputmode="numeric" id="run-sec" placeholder="00" aria-label="Seconds" autocomplete="off"><span class="muted">sec</span></span></div>
+    <p class="err" id="run-err" hidden>Enter a distance and a time.</p>
+    <div class="syncdlg-btns">
+      <button type="button" id="run-cancel">Cancel</button>
+      <button type="button" id="run-save" class="go">Save run</button>
     </div>
   </div>
 </div>
@@ -592,7 +613,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "34 · Nov 22";
+  var APP_VERSION = "35 · Nov 25";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1015,7 +1036,8 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     try {
       var cur = localStorage.getItem("ptb-db-v1");
       if (cur) localStorage.setItem("ptb-db-archive-" + BLOCK, cur);
-      localStorage.setItem("ptb-db-v1", JSON.stringify({ logs: {}, bodyweight: {} }));
+      var keepRuns = {}; try { keepRuns = (JSON.parse(cur) || {}).runs || {}; } catch (e) {}
+      localStorage.setItem("ptb-db-v1", JSON.stringify({ logs: {}, bodyweight: {}, runs: keepRuns })); // runs carry across blocks
     } catch (e) { return; }
     store("ptb-running", null);
     store(PROG_KEY, P);
@@ -1283,7 +1305,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var VIEWS = ["today", "week", "log", "maxes"];
   var view = VIEWS.indexOf(location.hash.slice(1)) >= 0 ? location.hash.slice(1) : (location.hash === "#history" ? "log" : "today");
 
-  var logs = {}, bodyweight = {}, drafts = {}, firstLogs = true;
+  var logs = {}, bodyweight = {}, runs = {}, drafts = {}, firstLogs = true;
   var db = null, dbState = "loading";
   var running = recall("ptb-running");
   if (running && Date.now() - running.start > 4 * 3600000) { running = null; store("ptb-running", null); }
@@ -1313,7 +1335,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     var cur = sel || nowPick;
     document.getElementById("ctx").textContent = view === "week" ? BLOCK + " Block · Week " + weekSel + " of " + WEEKS.length : (cur.extra ? BLOCK + " Block · Extra session" : BLOCK + " Block · Week " + cur.week + " of " + WEEKS.length);
     viewEl.innerHTML = "";
-    if (view === "today") renderToday();
+    if (view === "today") { renderToday(); viewEl.appendChild(runButton("I went for a run")); }
     else if (view === "week") renderWeek();
     else if (view === "log") renderLog();
     else renderMaxes();
@@ -2606,6 +2628,25 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   function statBlock(k, v) { var d = el("div", "stat"); d.appendChild(el("span", "k", k)); d.appendChild(el("span", "v", v)); return d; }
   function e1rm(w, r) { return r <= 1 ? w : Math.round(w * (1 + r / 30)); }
   var barSel = null;
+  function bestE1rm() {
+    var best = {};
+    loggedIds().forEach(function (id) {
+      var s = sessDef(id), lg = logs[id]; if (!s || !s.blocks) return;
+      s.blocks.forEach(function (b) { b.items.forEach(function (it) {
+        if (!it.main) return;
+        var v = (lg.items || {})[it.k] || {}, ck = (lg.checks || {})[it.k] || [], sets = expandSets(it);
+        sets.forEach(function (st, i) {
+          if (!ck[i]) return;
+          var w = v.sets ? v.sets[i] : (st.p === topOf(it)[1] ? v.w : null);
+          var r = v.reps && v.reps[i] != null ? v.reps[i] : st.r;
+          if (w == null || (v.miss && v.miss[i])) return;
+          var e = e1rm(w, r), cur = best[it.main];
+          if (!cur || e > cur.e) best[it.main] = { e: e, w: w, r: r, date: sessDate(id) };
+        });
+      }); });
+    });
+    return best;
+  }
 
   function renderLog() {
     var ids = loggedIds();
@@ -2620,6 +2661,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       e.appendChild(el("h3", null, "Nothing logged yet"));
       e.appendChild(el("p", "muted", dbState === "none" ? "Open this page signed in to claude.ai to save sets." : "Check off sets on the Today tab and your stats show up here."));
       viewEl.appendChild(e);
+      renderRunsCard();
       return;
     }
     var first = ids.map(sessDate).sort()[0];
@@ -2677,38 +2719,6 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     c3.appendChild(ro);
     viewEl.appendChild(c3);
 
-    // Main lifts: best set and estimated max vs tested 1RM
-    var best = {};
-    ids.forEach(function (id) {
-      var s = sessDef(id), lg = logs[id]; if (!s || !s.blocks) return;
-      s.blocks.forEach(function (b) { b.items.forEach(function (it) {
-        if (!it.main) return;
-        var v = (lg.items || {})[it.k] || {}, ck = (lg.checks || {})[it.k] || [], sets = expandSets(it);
-        sets.forEach(function (st, i) {
-          if (!ck[i]) return;
-          var w = v.sets ? v.sets[i] : (st.p === topOf(it)[1] ? v.w : null);
-          var r = v.reps && v.reps[i] != null ? v.reps[i] : st.r;
-          if (w == null || (v.miss && v.miss[i])) return;
-          var e = e1rm(w, r), cur = best[it.main];
-          if (!cur || e > cur.e) best[it.main] = { e: e, w: w, r: r, date: sessDate(id) };
-        });
-      }); });
-    });
-    var c4 = el("section", "hcard");
-    c4.appendChild(el("h3", null, "Main lifts"));
-    c4.appendChild(el("p", "hsub", "Best set so far and its estimated max, against your tested 1RM."));
-    var ml = el("div");
-    Object.keys(TM).forEach(function (k) {
-      var r = el("div", "mlrow"), bb = best[k];
-      r.appendChild(el("span", "n", TM_NAMES[k]));
-      r.appendChild(el("span", "e", bb ? "e1RM " + bb.e : "—"));
-      var m = el("div", "meter"), f = el("div"); f.style.width = (bb ? Math.min(100, 100 * bb.e / ONE_RM[k]) : 0) + "%"; m.appendChild(f); r.appendChild(m);
-      r.appendChild(el("span", "d", bb ? "Best " + bb.w + " × " + bb.r + " on " + short(parseISO(bb.date)) + " · 1RM " + ONE_RM[k] + " (" + Math.round(100 * bb.e / ONE_RM[k]) + "%)" : "Not logged yet · 1RM " + ONE_RM[k]));
-      ml.appendChild(r);
-    });
-    c4.appendChild(ml);
-    viewEl.appendChild(c4);
-
     // Lift history: barbell and key lifts first, tap one to see every session.
     var groups = {}, order = [];
     ids.forEach(function (id) {
@@ -2758,24 +2768,8 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       viewEl.appendChild(c4b);
     }
 
-    // Notes and flags
-    var flags = [];
-    ids.forEach(function (id) {
-      var lg = logs[id], st = statsOf(id);
-      if (lg.notes && lg.notes.trim()) flags.push({ id: id, txt: lg.notes.trim(), watch: /pain|irritat|sore|tweak|hurt|ache|strain|elbow|wrist|knee|back|shoulder/i.test(lg.notes) });
-      if (st.miss) flags.push({ id: id, txt: st.miss + " set" + (st.miss > 1 ? "s" : "") + " with missed reps.", watch: true });
-    });
-    if (flags.length) {
-      var c5 = el("section", "hcard");
-      c5.appendChild(el("h3", null, "Notes and flags"));
-      flags.slice(0, 6).forEach(function (f) {
-        var d = el("div", "flag" + (f.watch ? " watch" : ""));
-        d.appendChild(el("span", "fh", (f.watch ? "Watch · " : "") + short(parseISO(sessDate(f.id))) + " · " + sessTitle(f.id)));
-        d.appendChild(el("span", null, f.txt));
-        c5.appendChild(d);
-      });
-      viewEl.appendChild(c5);
-    }
+    // Runs
+    renderRunsCard();
 
     // Body weight
     var bwk = Object.keys(bodyweight).filter(function (k) { return bodyweight[k] && bodyweight[k].lb != null; }).sort();
@@ -2817,6 +2811,66 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     viewEl.appendChild(c7);
   }
 
+  // ---------- Runs ----------
+  // A run is just distance and time, saved with today's date. Pace is worked out here.
+  function fmtDur(sec) { sec = Math.round(sec); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; return (h ? h + ":" + (m < 10 ? "0" : "") : "") + m + ":" + (x < 10 ? "0" : "") + x; }
+  function runPace(r) { return r.mi > 0 && r.sec > 0 ? fmtDur(r.sec / r.mi) + "/mi" : "—"; }
+  function runList() { return Object.keys(runs).filter(function (k) { return runs[k] && !runs[k].deleted && runs[k].mi > 0; }).map(function (k) { return Object.assign({ id: k }, runs[k]); }).sort(function (a, b) { return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); }); }
+  function runButton(label) {
+    var b = el("button", "runbtn", label || "Add a run"); b.type = "button";
+    b.addEventListener("click", function () { openRun(); });
+    return b;
+  }
+  function openRun() {
+    var d = $("rundlg"); if (!d || !db) return;
+    $("run-mi").value = ""; $("run-min").value = ""; $("run-sec").value = ""; $("run-err").hidden = true;
+    $("run-date").textContent = longDay(parseISO(today));
+    d.hidden = false;
+    setTimeout(function () { try { $("run-mi").focus(); } catch (e) {} }, 50);
+  }
+  function saveRun() {
+    var mi = parseFloat($("run-mi").value), mn = parseInt($("run-min").value || "0", 10), sc = parseInt($("run-sec").value || "0", 10);
+    var sec = (isFinite(mn) ? mn : 0) * 60 + (isFinite(sc) ? sc : 0);
+    if (!(mi > 0) || !(sec > 0) || mi > 200) { $("run-err").hidden = false; return; }
+    var id = "r-" + Date.now();
+    db.doc("runs/" + id).set({ date: today, mi: Math.round(mi * 100) / 100, sec: sec, updatedAt: new Date().toISOString() });
+    $("rundlg").hidden = true;
+  }
+  function deleteRun(id) {
+    if (!runs[id]) return;
+    db.doc("runs/" + id).set(Object.assign({}, runs[id], { deleted: true, updatedAt: new Date().toISOString() }));
+  }
+  function renderRunsCard() {
+    var list = runList();
+    var c = el("section", "hcard");
+    c.appendChild(el("h3", null, "Runs"));
+    var wkStart = iso(addDays(parseISO(today), -((parseISO(today).getDay() + 6) % 7)));
+    var wkMi = 0; list.forEach(function (r) { if (r.date >= wkStart && r.date <= today) wkMi += r.mi; });
+    c.appendChild(el("p", "hsub", list.length ? (Math.round(wkMi * 10) / 10) + " mi this week (since Monday) · " + list.length + (list.length === 1 ? " run" : " runs") + " logged" : "Log a run with just distance and time."));
+    if (list.length) {
+      var hl = el("div", "hlist");
+      list.slice(0, 20).forEach(function (r) {
+        var row = el("div", "lrow runrow");
+        row.appendChild(el("span", "lt", short(parseISO(r.date)) + " · " + r.mi + " mi"));
+        var del = el("button", "rundel", "Delete"); del.type = "button";
+        del.setAttribute("aria-label", "Delete run on " + short(parseISO(r.date)));
+        del.addEventListener("click", function () { if (del.getAttribute("data-c")) deleteRun(r.id); else { del.setAttribute("data-c", "1"); del.textContent = "Tap to confirm"; } });
+        row.appendChild(del);
+        var ls = el("span", "ls"); ls.appendChild(el("span", null, fmtDur(r.sec) + " · " + runPace(r))); row.appendChild(ls);
+        hl.appendChild(row);
+      });
+      c.appendChild(hl);
+    }
+    c.appendChild(runButton());
+    viewEl.appendChild(c);
+  }
+  (function () {
+    var d = $("rundlg"); if (!d) return;
+    $("run-cancel").addEventListener("click", function () { d.hidden = true; });
+    $("run-save").addEventListener("click", saveRun);
+    ["run-mi", "run-min", "run-sec"].forEach(function (k) { $(k).addEventListener("keydown", function (e) { if (e.key === "Enter") saveRun(); }); $(k).addEventListener("input", function () { $("run-err").hidden = true; }); });
+  })();
+
   // ---------- Maxes ----------
   function renderMaxes() {
     var card = el("section", "card");
@@ -2824,15 +2878,17 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     pad.appendChild(el("h3", null, "Training maxes"));
     var tw = WEEKS.filter(function (x) { return x.test; })[0];
     pad.appendChild(el("p", "muted", "Loads use 90% of your 1-rep maxes, the PPSA \"everyday max\": a weight you can hit on a bad day." + (tw ? " Retested in week " + tw.n + "." : "") + " Tap a training max to change it; every planned weight follows." + (SETTINGS.syncUrl ? " They're kept on the Maxes tab of your Google Sheet." : "")));
+    pad.appendChild(el("p", "muted", "Est. max is your best logged set on each lift, run through a rep-max formula and rounded down to 5."));
     card.appendChild(pad);
     var hdr = el("div", "tmrow");
-    hdr.appendChild(el("span", "eyebrow", "Lift")); hdr.appendChild(el("span", "eyebrow", "1RM")); hdr.appendChild(el("span", "eyebrow", "Training max"));
+    hdr.appendChild(el("span", "eyebrow", "Lift")); hdr.appendChild(el("span", "eyebrow", "1RM")); hdr.appendChild(el("span", "eyebrow", "Est. max")); hdr.appendChild(el("span", "eyebrow", "Training max"));
     card.appendChild(hdr);
-    var tested = testedBests();
+    var tested = testedBests(), est = bestE1rm();
     Object.keys(TM).forEach(function (k) {
       var r = el("div", "tmrow");
       r.appendChild(el("span", null, TM_NAMES[k]));
       r.appendChild(el("span", "mono muted", String(ONE_RM[k])));
+      r.appendChild(el("span", "mono", est[k] ? String(Math.floor(est[k].e / 5) * 5) : "—"));
       var cell = el("span", "tmcell");
       var inp = numInput("w tmin", function () { return {
         onInput: function () {},
@@ -3156,6 +3212,12 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
         if (view === "today" && firstLogs && !typing) { firstLogs = false; render(); }
         else if (view === "today") syncToday(); else if (view === "log" || (view === "week" && !KP.isOpen() && document.activeElement && document.activeElement.id !== "bw-input")) render();
       }, function () { dbState = "none"; saveText = ""; updateSave(); });
+      db.collection("runs").onSnapshot(function (snap) {
+        var next = {};
+        snap.docs.forEach(function (doc) { next[doc.id] = doc.data(); });
+        runs = next;
+        if (view === "log") render();
+      }, function () {});
       db.collection("bodyweight").onSnapshot(function (snap) {
         var next = {};
         snap.docs.forEach(function (doc) { next[doc.id] = doc.data(); });
@@ -3216,12 +3278,20 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
           var dd = String(row[2] || "").slice(0, 10);
           window.__wrPut("bodyweight", "w" + wk, { week: wk, lb: lb, updatedAt: /^\d{4}-\d{2}-\d{2}$/.test(dd) ? dd + "T12:00:00.000Z" : new Date().toISOString() });
         });
+        var haveR = d.runs || {};
+        (res.runs || []).forEach(function (row) {
+          var id = String(row[1] || ""), mi = Number(row[3]), sec = secOf(row[4]);
+          if (!id || haveR[id] || !(mi > 0) || !(sec > 0)) return;
+          window.__wrPut("runs", id, { date: String(row[2] || "").slice(0, 10), mi: mi, sec: sec, updatedAt: new Date().toISOString() });
+        });
         put(RESTORED, new Date().toISOString());
       }, function () { restoring = false; });
   }
+  function fmt(sec) { sec = Math.round(sec); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; return (h ? h + ":" + (m < 10 ? "0" : "") : "") + m + ":" + (x < 10 ? "0" : "") + x; }
+  function secOf(t) { if (typeof t === "number") return t > 0 && t < 1 ? Math.round(t * 86400) : t; var p = String(t || "").split(":").map(Number); return p.reduce(function (a, b) { return a * 60 + (b || 0); }, 0); }
   function schedule(ms) { clearTimeout(timer); timer = setTimeout(flush, ms); }
   function mark(col, id) {
-    if (col !== "logs" && col !== "bodyweight" && col !== "maxes") return;
+    if (col !== "logs" && col !== "bodyweight" && col !== "maxes" && col !== "runs") return;
     pending[col + "/" + id] = stampOf();
     put(PEND, pending);
     show();
@@ -3240,6 +3310,12 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       sent[k] = pending[k];
       if (col === "maxes") { try { body.maxes = window.WR.maxesOut(); } catch (e) {} return; }
       if (!doc) return;
+      if (col === "runs") {
+        var pace = doc.mi > 0 && doc.sec > 0 ? Math.round(doc.sec / doc.mi) : 0;
+        (body.runs = body.runs || []).push({ id: id, block: window.WR.block, date: doc.date, mi: doc.mi, sec: doc.sec,
+          time: fmt(doc.sec), pace: pace ? fmt(pace) : "", deleted: !!doc.deleted });
+        return;
+      }
       try {
         if (col === "logs") body.sessions.push(window.WR.rows(id, doc));
         else body.bodyweight.push(window.WR.bodyweightRow(id, doc));
@@ -3252,7 +3328,8 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       .then(function (res) {
         busy = false;
         if (res && res.ok) {
-          Object.keys(sent).forEach(function (k) { if (pending[k] === sent[k]) delete pending[k]; });
+          // A sync script older than v6 ignores runs: they wait on the phone until the script is updated.
+          Object.keys(sent).forEach(function (k) { if (pending[k] === sent[k] && (k.indexOf("runs/") !== 0 || res.runs != null)) delete pending[k]; });
           put(PEND, pending); put(LAST, new Date().toISOString());
           state = "";
         } else if (res && res.error === "passcode") {

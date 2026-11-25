@@ -289,7 +289,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "19";
+  var VERSION = "20";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1569,13 +1569,12 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       if (bl.length) {
         var c4 = el("section", "card");
         c4.appendChild(el("h3", null, "Estimated maxes"));
-        c4.appendChild(el("p", "hsub", "Your 1-rep max, estimated from your best set."));
+        c4.appendChild(el("p", "hsub", "Your 1-rep max, estimated from your best set and rounded down to 5."));
         var ml = el("div");
         bl.forEach(function (k) {
           var bb = best[k], r = el("div", "mlrow");
           r.appendChild(el("span", "n", k));
-          r.appendChild(el("span", "e", bb.e + " lb"));
-          r.appendChild(el("span", "d", "From " + bb.n.toLowerCase() + " " + bb.w + " × " + bb.r + (bb.date ? " on " + fmtDay(bb.date).replace(/^\w+, /, "") : "")));
+          r.appendChild(el("span", "e", Math.floor(bb.e / 5) * 5 + " lb"));
           ml.appendChild(r);
         });
         c4.appendChild(ml);
