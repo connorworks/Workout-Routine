@@ -270,6 +270,21 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 .item.vid .lastcard, .item.vid .shead, .item.vid .srow .sn, .item.vid .srow input, .item.vid .srow .wbox, .item.vid > .rx { display: none; }
 .item.vid .srow { display: flex; align-items: center; justify-content: space-between; }
 .item.vid .srow::before { content: "Done with the video"; font-weight: 700; }
+.card.streak { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; text-align: left; gap: 14px; }
+.streak .flame { width: 48px; height: 48px; flex: none; border-radius: 50%; background: #FDF1D6; color: #B7791F; display: flex; align-items: center; justify-content: center; }
+.streak .big { font-size: 22px; font-weight: 800; }
+.trhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.trhead h3 { margin: 0; }
+.trbar { height: 6px; border-radius: 3px; background: var(--line); margin: 10px 0 6px; overflow: hidden; }
+.trbar > div { height: 100%; border-radius: 3px; background: var(--accent); }
+.trow { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.trow:first-of-type { border-top: none; }
+.trow.now { background: var(--accent-soft); border-radius: 10px; margin: 0 -8px; padding: 8px; border-top-color: transparent; }
+.trow .tw { font-weight: 700; }
+.trow .tnow { font-weight: 500; color: var(--accent); font-size: 13px; }
+.trow .tc { color: var(--muted); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 6px; }
+.trow .gold { color: #E0A100; font-size: 18px; line-height: 1; }
+.trow .rg { display: flex; }
 </style>
 </head>
 <body>
@@ -302,7 +317,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "26";
+  var VERSION = "27";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1633,8 +1648,74 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
   function statTile(k, v) { var d = el("div", "stat"); d.appendChild(el("span", "k", k)); d.appendChild(el("span", "v", v)); return d; }
   function volOf(x) { var v = 0, r = 0; x.sets.forEach(function (t) { if (t.r && !t.timed) { r += t.r; if (t.w > 0) v += t.w * t.r; } }); return { vol: v, reps: r }; }
   var barSel = null;
+  // ---------- Streak and program track ----------
+  // A week counts toward the streak when every scheduled (non-bonus) workout in it is done. Weeks before the
+  // current one that aren't complete reset it; the current week only adds once it's complete.
+  function weekStats() {
+    var m = model(), cur = weekNow();
+    return m.weeks.map(function (w) {
+      var reg = m.sessions.filter(function (x) { return x.week === w && !x.opt; });
+      var bonus = m.sessions.filter(function (x) { return x.week === w && x.opt; });
+      var phase = "";
+      reg.forEach(function (x) { var p = x.title.split(" · ").slice(1).join(" · "); if (p && !phase) phase = p; });
+      return { w: w, n: reg.length, done: reg.filter(function (x) { return isDone(x.id); }).length,
+        bonus: bonus.some(function (x) { return isDone(x.id); }), phase: phase, cur: w === cur };
+    });
+  }
+  function streakOf(ws) {
+    var k = 0, curIdx = -1;
+    ws.forEach(function (x, i) { if (x.cur) curIdx = i; });
+    if (curIdx < 0) curIdx = ws.length - 1;
+    for (var i = 0; i <= curIdx; i++) {
+      var full = ws[i].n > 0 && ws[i].done >= ws[i].n;
+      if (i < curIdx) k = full ? k + 1 : 0; else if (full) k++;
+    }
+    return k;
+  }
+  function ringSvg(done, n) {
+    var r = 16, c = 2 * Math.PI * r, full = n > 0 && done >= n, f = n ? c * Math.min(done, n) / n : 0;
+    var col = full ? "var(--ok)" : "var(--accent)";
+    return '<svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" fill="none" stroke="var(--line)" stroke-width="4"/>' +
+      (done ? '<circle cx="20" cy="20" r="16" fill="none" stroke="' + col + '" stroke-width="4" stroke-linecap="round" stroke-dasharray="' + f.toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 20 20)"/>' : '') +
+      (full ? '<path d="M14 20.5l4 4 8-9" fill="none" stroke="var(--ok)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' : '') + '</svg>';
+  }
+  function trackCards() {
+    var ws = weekStats(); if (!ws.length) return;
+    var st = streakOf(ws);
+    var c0 = el("section", "card streak");
+    var ic = el("div", "flame"); ic.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3-1-3 0-6 1-8.5z"/></svg>';
+    c0.appendChild(ic);
+    var tx = el("div");
+    tx.appendChild(el("div", "big", st + "-week streak"));
+    tx.appendChild(el("div", "hsub", st ? "Weeks in a row with every workout done" : "Finish every workout this week to start one"));
+    c0.appendChild(tx);
+    viewEl.appendChild(c0);
+    var c = el("section", "card track");
+    var tot = 0, dn = 0, bn = 0; ws.forEach(function (x) { tot += x.n; dn += Math.min(x.done, x.n); if (x.bonus) bn++; });
+    var hd = el("div", "trhead");
+    hd.appendChild(el("h3", null, "Your " + ws.length + " weeks"));
+    hd.appendChild(el("span", "hsub", dn + " of " + tot + " workouts" + (bn ? " · " + bn + " bonus" : "")));
+    c.appendChild(hd);
+    var bar = el("div", "trbar"), fill = el("div"); fill.style.width = (tot ? Math.round(dn / tot * 100) : 0) + "%"; bar.appendChild(fill); c.appendChild(bar);
+    ws.forEach(function (x) {
+      var r = el("div", "trow" + (x.cur ? " now" : ""));
+      var rg = el("span", "rg"); rg.innerHTML = ringSvg(x.done, x.n); r.appendChild(rg);
+      var mid = el("div");
+      var t = el("div", "tw", "Week " + x.w); if (x.cur) t.appendChild(el("span", "tnow", " · this week"));
+      mid.appendChild(t);
+      if (x.phase) mid.appendChild(el("div", "hsub", x.phase));
+      r.appendChild(mid);
+      var ct = el("div", "tc", Math.min(x.done, x.n) + "/" + x.n);
+      if (x.bonus) { var sv = el("span", "gold"); sv.setAttribute("aria-label", "Bonus done"); sv.textContent = "★"; ct.appendChild(sv); }
+      r.appendChild(ct);
+      c.appendChild(r);
+    });
+    viewEl.appendChild(c);
+  }
+
   function renderHistory() {
     var L = loggedSessions(), m = model();
+    trackCards();
     if (L.length) {
       var all = { vol: 0, reps: 0, n: 0, min: 0 }, wk = {};
       L.forEach(function (x) {
