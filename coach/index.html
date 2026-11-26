@@ -302,7 +302,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "23";
+  var VERSION = "24";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -494,6 +494,8 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     return null;
   }
   function sessLabel(s) { return "Week " + s.week + (s.opt ? " · Optional" : s.day && s.day !== s.title ? " · " + s.day : ""); }
+  // An optional workout's name without the "Bonus ·" prefix or "(optional)": the row already says Bonus.
+  function optTitle(s) { return s.title.replace(/^\s*bonus\s*[·:\-–—|]?\s*/i, "").replace(/\s*\(optional\)\s*/i, "").trim() || s.title; }
   // This week's optional extras that aren't done or already on today.
   function bonusFor(wk) {
     return model().sessions.filter(function (x) { return x.opt && x.week === wk && !isDone(x.id) && dateOf(x.id) !== isoDay(); });
@@ -502,7 +504,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     var c = el("section", "card bonus");
     c.appendChild(el("div", "eyebrow", "Optional this week"));
     list.forEach(function (x) {
-      c.appendChild(el("h2", null, x.title.replace(/\s*\(optional\)\s*/i, "")));
+      c.appendChild(el("h2", null, optTitle(x)));
       var sets = 0; x.items.forEach(function (it) { sets += it.sets; });
       c.appendChild(el("p", "muted", "Any day you have a few spare minutes, even right after a workout. Skip it and nothing counts as missed."));
       var row = el("div", "btnrow");
@@ -1069,12 +1071,13 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     list.forEach(function (s) {
       var b = el("button", "srow-btn" + (nx && nx.id === s.id ? " next" : "")); b.type = "button";
       var dl = s.day && s.day !== s.title ? s.day : "Week " + s.week, dt = plan().on ? dateOf(s.id) : "";
+      if (s.opt) { dl = "Bonus"; if (!isStarted(s.id) && !isDone(s.id)) dt = ""; }
       b.appendChild(el("span", "k", dt ? fmtDay(dt) + " · " + dl : dl));
       var st = isDone(s.id) ? el("span", "pill done", "Done") : isStarted(s.id) ? el("span", "pill prog-p", "Started")
         : isMissed(s.id) ? el("span", "pill miss", "Missed") : dt === isoDay() ? el("span", "pill prog-p", "Today")
         : s.opt ? null : el("span", "pill", "To do");
       if (st) { st.classList.add("st"); b.appendChild(st); }
-      b.appendChild(el("span", "n", s.title));
+      b.appendChild(el("span", "n", s.opt ? optTitle(s) : s.title));
       b.addEventListener("click", function () { open(s.id); });
       box.appendChild(b);
     });
