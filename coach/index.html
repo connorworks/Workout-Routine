@@ -317,7 +317,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "28";
+  var VERSION = "29";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1654,7 +1654,8 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       var reg = m.sessions.filter(function (x) { return x.week === w && !x.opt; });
       var bonus = m.sessions.filter(function (x) { return x.week === w && x.opt; });
       var phase = "";
-      reg.forEach(function (x) { var p = x.title.split(" · ").slice(1).join(" · "); if (p && !phase) phase = p; });
+      // The phase is the last part of a workout's name after " · " ("Full body A · Build" -> Build).
+      reg.forEach(function (x) { var p = x.title.split(" · "); if (p.length > 1 && !phase) phase = p[p.length - 1].trim(); });
       return { w: w, n: reg.length, done: reg.filter(function (x) { return isDone(x.id); }).length,
         bonus: bonus.some(function (x) { return isDone(x.id); }), phase: phase, cur: w === cur };
     });
