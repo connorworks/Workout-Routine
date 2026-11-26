@@ -302,7 +302,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "25";
+  var VERSION = "26";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1709,27 +1709,11 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
         viewEl.appendChild(c4);
       }
     }
-    var names = [], seenN = {};
-    function add(n) { var k = norm(n); if (k && !seenN[k]) { seenN[k] = 1; names.push(n); } }
-    model().sessions.forEach(function (s) { s.items.forEach(function (it) { add(it.n); }); });
-    Object.keys(remote()).forEach(function (id) { remote()[id].order.forEach(add); });
-    var groups = names.map(function (n) { return { n: n, list: historyOf(n) }; }).filter(function (g) { return g.list.length; });
-    var c = el("section", "card");
-    if (!groups.length) {
-      c.appendChild(el("p", "muted", "Your lifts show up here after your first workout."));
-      viewEl.appendChild(c); return;
+    if (!L.length) {
+      var e0 = el("section", "card");
+      e0.appendChild(el("p", "muted", "Your workouts show up here after your first one."));
+      viewEl.appendChild(e0);
     }
-    groups.sort(function (a, b) { return String(b.list[0].date).localeCompare(String(a.list[0].date)) || a.n.localeCompare(b.n); });
-    c.appendChild(el("h3", null, "Lift history"));
-    c.appendChild(el("p", "hsub", "Tap a lift to see every session."));
-    groups.forEach(function (g) {
-      var d = el("details", "lh"), sm = el("summary");
-      sm.appendChild(el("span", "n", g.n));
-      sm.appendChild(el("span", "c", g.list.length + (g.list.length === 1 ? " session" : " sessions") + (g.list[0].date ? " · " + fmtDay(g.list[0].date).replace(/^\w+, /, "") : "")));
-      d.appendChild(sm); d.appendChild(histList(g.list, g.n));
-      c.appendChild(d);
-    });
-    viewEl.appendChild(c);
     viewEl.appendChild(el("div", "foot", (data.client && data.client.name ? data.client.name + " · " : "") + "v" + VERSION));
   }
 
