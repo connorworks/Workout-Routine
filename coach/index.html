@@ -285,6 +285,8 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 .trow .tc { color: var(--muted); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 6px; }
 .trow .gold { color: #E0A100; font-size: 18px; line-height: 1; }
 .trow .rg { display: flex; }
+.welcome .steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; }
+.welcome .steps .ico { vertical-align: -3px; color: var(--accent); }
 </style>
 </head>
 <body>
@@ -317,7 +319,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "29";
+  var VERSION = "30";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -855,16 +857,64 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     viewEl.appendChild(c);
   }
 
+  // ---------- Add to Home Screen ----------
+  // First open on a phone (not yet installed): a welcome card with steps for that phone. "Maybe later" shrinks it
+  // to a one-line reminder on later visits; "I added it" hides it for good. Opened from the Home Screen, it never shows.
+  var installEvt = null;
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); installEvt = e; if (view === "today") render(); });
   function homeTip() {
+    var ua = navigator.userAgent || "";
     var standalone = window.navigator.standalone || (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
-    if (standalone || load("coach-tip-done")) return null;
-    var b = el("div", "banner");
-    b.appendChild(el("span", null, "Add this to your Home Screen: tap Share, then Add to Home Screen. It opens like an app."));
-    var x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", "Dismiss");
-    x.addEventListener("click", function () { save("coach-tip-done", 1); b.remove(); });
-    b.appendChild(x);
-    return b;
+    var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1), android = /Android/.test(ua);
+    if (standalone || DEMO && !qs.has("tip") || load("coach-tip-done") || !(ios || android || qs.has("tip"))) return null;
+    var inApp = /FBAN|FBAV|Instagram|Line\/|GSA\/|LinkedInApp|Snapchat/.test(ua) || (ios && !/Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua));
+    var done = function () { save("coach-tip-done", 1); render(); };
+    if (load("coach-tip-later")) {
+      var b = el("div", "banner");
+      var t = el("button", "linkbtn", "Add this app to your Home Screen"); t.type = "button";
+      t.addEventListener("click", function () { save("coach-tip-later", 0); render(); window.scrollTo(0, 0); });
+      b.appendChild(t);
+      var x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", "Don't show again");
+      x.addEventListener("click", done);
+      b.appendChild(x);
+      return b;
+    }
+    var c = el("section", "card welcome");
+    c.appendChild(el("div", "eyebrow", "Welcome" + (firstName() ? ", " + firstName() : "")));
+    c.appendChild(el("h2", null, "Put this on your Home Screen"));
+    c.appendChild(el("p", "muted", "It opens like an app, full screen, with your workouts ready. Takes 10 seconds."));
+    var ol = el("ol", "steps");
+    var step = function (html) { var li = el("li"); li.innerHTML = html; ol.appendChild(li); };
+    var SHARE = '<svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></svg>';
+    if (inApp) {
+      step("Open this page in " + (ios ? "Safari" : "Chrome") + ": tap the <b>⋯</b> or <b>⋮</b> menu and choose <b>Open in " + (ios ? "Safari" : "browser") + "</b>.");
+      step("Then come back to these steps.");
+    } else if (ios) {
+      step("Tap the Share button " + SHARE + " (bottom of Safari, or top right on iPad).");
+      step("Scroll down and tap <b>Add to Home Screen</b>.");
+      step("Tap <b>Add</b>, then open <b>" + esc((document.getElementById("apptitle") || {}).content || "the app") + "</b> from your Home Screen.");
+    } else {
+      step("Tap the <b>⋮</b> menu in the top right of Chrome.");
+      step("Tap <b>Add to Home screen</b> or <b>Install app</b>.");
+      step("Tap <b>Install</b>, then open it from your Home Screen.");
+    }
+    c.appendChild(ol);
+    var row = el("div", "btnrow");
+    if (installEvt) {
+      var ib = el("button", "btn", "Install app"); ib.type = "button";
+      ib.addEventListener("click", function () { installEvt.prompt(); installEvt.userChoice.then(function (r) { if (r && r.outcome === "accepted") done(); }); });
+      row.appendChild(ib);
+    }
+    var lb = el("button", "btn ghost", "Maybe later"); lb.type = "button";
+    lb.addEventListener("click", function () { save("coach-tip-later", 1); render(); });
+    var db = el("button", installEvt ? "btn ghost" : "btn", "I added it"); db.type = "button";
+    db.addEventListener("click", done);
+    row.appendChild(lb); row.appendChild(db);
+    c.appendChild(row);
+    return c;
   }
+
 
   // ---------- Schedule ----------
   // The Clients tab gives a start date and training days ("Mon, Wed, Fri", "2 on, 2 off").
