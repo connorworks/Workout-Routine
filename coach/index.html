@@ -302,7 +302,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "21";
+  var VERSION = "22";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -327,6 +327,9 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
         out.push({ id: "w" + w + "-day-3", week: String(w), day: "Day 3", title: "Full body", items: [
           { block: "A", n: "Trap bar deadlift", sets: "3", reps: "5", load: dl[w - 1], rest: "2 min", notes: "" },
           { block: "B", n: "Lat pulldown", sets: "3", reps: "12/10/8", load: "100/110/120", rest: "75s", notes: "Heavier each set." } ] });
+        out.push({ id: "w" + w + "-bonus", week: String(w), day: "Bonus", title: "Bonus · Arms & shoulders (optional)", items: [
+          { block: "A1", n: "DB lateral raise", sets: "2", reps: "15", load: "5", rest: "", notes: "" },
+          { block: "A2", n: "DB biceps curl", sets: "2", reps: "15", load: "5", rest: "60s", notes: "" } ] });
       }
       return out;
     })()
@@ -435,7 +438,9 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
         used[k] = 1; x.key = k;
         return x;
       });
-      return { id: s.id, week: String(s.week), day: s.day || "", title: s.title || s.day || "", items: items };
+      // A Day or Session that says "Bonus" or "optional" is an extra: not scheduled, never missed, offered on Today.
+      var opt = /\bbonus\b|optional/i.test((s.day || "") + " " + (s.title || ""));
+      return { id: s.id, week: String(s.week), day: s.day || "", title: s.title || s.day || "", items: items, opt: opt };
     });
     var weeks = [];
     sessions.forEach(function (s) { if (weeks.indexOf(s.week) < 0) weeks.push(s.week); });
@@ -485,10 +490,32 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
   function isStarted(id) { return hasLocal(id) ? localStarted(logs[id]) : remoteStarted(id); }
   function nextSession() {
     var s = model().sessions;
-    for (var i = 0; i < s.length; i++) if (!isDone(s[i].id)) return s[i];
+    for (var i = 0; i < s.length; i++) if (!s[i].opt && !isDone(s[i].id)) return s[i];
     return null;
   }
-  function sessLabel(s) { return "Week " + s.week + (s.day && s.day !== s.title ? " · " + s.day : ""); }
+  function sessLabel(s) { return "Week " + s.week + (s.opt ? " · Optional" : s.day && s.day !== s.title ? " · " + s.day : ""); }
+  // This week's optional extras that aren't done or already on today.
+  function bonusFor(wk) {
+    return model().sessions.filter(function (x) { return x.opt && x.week === wk && !isDone(x.id) && dateOf(x.id) !== isoDay(); });
+  }
+  function bonusCard(list) {
+    var c = el("section", "card bonus");
+    c.appendChild(el("div", "eyebrow", "Optional this week"));
+    list.forEach(function (x) {
+      c.appendChild(el("h2", null, x.title.replace(/\s*\(optional\)\s*/i, "")));
+      var sets = 0; x.items.forEach(function (it) { sets += it.sets; });
+      c.appendChild(el("p", "muted", "Any day you have a few spare minutes, even right after a workout. Skip it and nothing counts as missed."));
+      var row = el("div", "btnrow");
+      var vb = el("button", "btn ghost", "Preview"); vb.type = "button"; vb.addEventListener("click", function () { open(x.id); });
+      var nb = el("button", "btn", "Do it today"); nb.type = "button"; nb.addEventListener("click", function () { moveTo(x, isoDay()); render(); window.scrollTo(0, 0); });
+      row.appendChild(vb); row.appendChild(nb); c.appendChild(row);
+    });
+    return c;
+  }
+  function weekNow() {
+    var t = todaySession() || (plan().on ? upcoming() : null) || nextSession();
+    return t ? t.week : null;
+  }
 
   // Every logged session of one exercise, newest first: local logs first, then rows from the sheet.
   function historyOf(name, exceptId) {
@@ -848,7 +875,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     var c = (data && data.client) || {}, st = parseISO(c.start), rule = parseDays(c.days);
     if (!st || !rule) return PL;
     PL.on = true; PL.start = isoDay(st);
-    var ss = model().sessions, d = st, k = 0;
+    var ss = model().sessions.filter(function (x) { return !x.opt; }), d = st, k = 0;
     for (var n = 0; k < ss.length && n < 3650; n++, d = addDays(d, 1)) {
       var train = rule.days ? rule.days.indexOf(d.getDay()) >= 0 : (n % (rule.on + rule.off)) < rule.on;
       if (train) PL.at[ss[k++].id] = isoDay(d);
@@ -865,11 +892,11 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     }
     return movedOf(id) || plannedOf(id);
   }
-  function isMissed(id) { return plan().on && !isDone(id) && !isStarted(id) && dateOf(id) && dateOf(id) < isoDay(); }
+  function isMissed(id) { var x = model().byId[id]; if (x && x.opt) return false; return plan().on && !isDone(id) && !isStarted(id) && dateOf(id) && dateOf(id) < isoDay(); }
   function upcoming() {
     var t = isoDay(), best = null;
     model().sessions.forEach(function (s) {
-      if (isDone(s.id) || isMissed(s.id)) return;
+      if (isDone(s.id) || isMissed(s.id) || (s.opt && !movedOf(s.id))) return;
       var d = dateOf(s.id) || t;
       if (d >= t && (!best || d < best.d)) best = { s: s, d: d };
     });
@@ -973,10 +1000,14 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     var tip = homeTip(); if (tip) viewEl.appendChild(tip);
     var m = model(), ts = m.sessions.length ? todaySession() : null;
     var missed = plan().on ? m.sessions.filter(function (x) { return isMissed(x.id); }) : [];
+    var bwk = weekNow(), bonus = bwk ? bonusFor(bwk) : [];
     if (ts) {
       viewEl.appendChild(hype(isDone(ts.id) ? "done" : "lift"));
       if (missed.length) viewEl.appendChild(missedCard(missed));
-      return renderSession(ts, true);
+      if (isDone(ts.id) && bonus.length) viewEl.appendChild(bonusCard(bonus));
+      renderSession(ts, true);
+      if (!isDone(ts.id) && bonus.length) viewEl.appendChild(bonusCard(bonus));
+      return;
     }
     if (plan().on && m.sessions.some(function (x) { return !isDone(x.id); })) {
       // Nothing on the schedule today.
@@ -994,6 +1025,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
         row.appendChild(vb); row.appendChild(nb); rc.appendChild(row);
       } else rc.appendChild(el("p", "muted", "Nothing else on the schedule. Move a missed workout to today to catch up."));
       viewEl.appendChild(rc);
+      if (bonus.length) viewEl.appendChild(bonusCard(bonus));
       return;
     }
     var nx = nextSession();
@@ -1315,6 +1347,11 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     [/glute bridge/i, ["Lie on your back, knees bent, feet flat and hip-width; dumbbell on your hips.", "Push through your heels and lift your hips until knees, hips and shoulders line up.", "Squeeze your glutes for a second at the top; don't arch your low back."]],
     [/shoulder tap/i, ["Top of a push-up, hands under shoulders, feet wide.", "Lift one hand to tap the opposite shoulder, then switch.", "Keep your hips still: no rocking side to side."]],
     [/kb deadlift|kettlebell deadlift/i, ["Bell between your feet, feet hip-width.", "Push your hips back, flat back, grab the handle with both hands.", "Stand up by driving your hips forward and squeezing your glutes. This is the motion behind the swing."]],
+    [/front raise/i, ["Dumbbells in front of your thighs, slight bend in the elbows.", "Raise straight in front to shoulder height, thumbs up.", "No leaning back or swinging; lower slowly."]],
+    [/reverse fly|rear raise/i, ["Hinge forward until your chest is nearly parallel to the floor, flat back.", "Slight bend in the elbows; raise the weights out to the sides, leading with your elbows.", "Squeeze the back of your shoulders at the top; don't shrug."]],
+    [/arm circles/i, ["Arms straight out to the sides at shoulder height.", "Small, quick circles: forward for half the time, then backward.", "Keep your shoulders down away from your ears; drop the weights if your arms sag."]],
+    [/kickback/i, ["Hinge forward, flat back, upper arms pinned to your sides, elbows bent.", "Straighten your arms back until they're in line with your body.", "Squeeze the back of your arms for a beat, then bend slowly. Only your forearms move."]],
+    [/pulses/i, ["Raise to the top position and hold it there.", "Pulse an inch or two up and down without resting.", "Stop when your form breaks; it should burn."]],
     [/cardio warm-up/i, ["Easy pace on any machine: you should be able to talk.", "Build a little over the 5 minutes.", "Aim to be warm and a bit sweaty before the first lift."]],
     [/easy cardio/i, ["Steady pace you could hold a conversation at.", "Any machine, or a jog or walk.", "This is recovery, not a workout: keep it easy."]],
     [/sprints?\b|intervals?/i, ["Hard parts: as fast as you can keep good form. Easy parts: slow right down and breathe.", "Use whatever's there: bike, rower, treadmill, stairs or elliptical.", "Count the rounds; a timer or the machine's interval setting helps."]],
@@ -1611,7 +1648,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       viewEl.appendChild(c1);
 
       var ts = todaySession() || (plan().on ? upcoming() : null), cw = ts ? ts.week : m.weeks[m.weeks.length - 1], tw = wk[cw] || { vol: 0, reps: 0, n: 0, min: 0 };
-      var planned = m.sessions.filter(function (x) { return x.week === cw; }).length;
+      var planned = m.sessions.filter(function (x) { return x.week === cw && !x.opt; }).length;
       var c2 = el("section", "card");
       c2.appendChild(el("h3", null, "This week"));
       c2.appendChild(el("p", "hsub", "Week " + cw + " · " + tw.n + " of " + planned + " workouts done"));
