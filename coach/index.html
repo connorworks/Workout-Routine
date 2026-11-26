@@ -317,7 +317,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "27";
+  var VERSION = "28";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1270,9 +1270,6 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       st.best.forEach(function (b) { var r = el("div", "sbrow"); r.appendChild(el("span", null, b.n)); r.appendChild(el("span", "m", b.txt)); hi.appendChild(r); });
       c.appendChild(hi);
     }
-    var ul = el("ul", "sumlist");
-    st.lines.forEach(function (x) { var li = el("li"); li.appendChild(el("span", "n", x.n)); li.appendChild(el("span", "v", x.txt)); ul.appendChild(li); });
-    c.appendChild(ul);
     if (st.skipped.length) c.appendChild(el("p", "muted small", "Skipped: " + st.skipped.join(", ")));
     if (lg.notes && String(lg.notes).trim()) c.appendChild(el("p", "sumnotes", String(lg.notes).trim()));
     viewEl.appendChild(c);
