@@ -257,6 +257,19 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 8; background: var(--bar); color: var(--bar-ink);
   border-radius: 99px; padding: 10px 18px; font-weight: 600; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
 .foot { text-align: center; font-size: 12px; color: var(--muted); padding: 8px 0; }
+.abs { display: flex; flex-direction: column; gap: 10px; }
+.absvid { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: none; border-radius: 12px; overflow: hidden; background: #000; cursor: pointer; }
+.absvid img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .9; }
+.absplay { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; padding-left: 4px; }
+.absframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; background: #000; }
+.abscap { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 15px; }
+.abst { font-weight: 700; }
+.absyt { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.absmore summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 4px 0; }
+.absopt { display: block; width: 100%; text-align: left; min-height: 44px; padding: 10px 12px; margin-top: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); color: var(--ink); font: inherit; cursor: pointer; }
+.item.vid .lastcard, .item.vid .shead, .item.vid .srow .sn, .item.vid .srow input, .item.vid .srow .wbox, .item.vid > .rx { display: none; }
+.item.vid .srow { display: flex; align-items: center; justify-content: space-between; }
+.item.vid .srow::before { content: "Done with the video"; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -289,7 +302,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "20";
+  var VERSION = "21";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -305,7 +318,8 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
           { block: "A", n: "Back squat", sets: "4", reps: "6", load: pct[w - 1], rest: "2 min", notes: "Brace before every rep. Hit depth." },
           { block: "B1", n: "Romanian deadlift", sets: "3", reps: "8", load: "135", rest: "", notes: "" },
           { block: "B2", n: "Walking lunge", sets: "3", reps: "10 each", load: "25", rest: "90s", notes: "Dumbbells in each hand." },
-          { block: "C", n: "Plank", sets: "3", reps: "30 sec", load: "", rest: "45s", notes: "" } ] });
+          { block: "C", n: "Plank", sets: "3", reps: "30 sec", load: "", rest: "45s", notes: "" },
+          { block: "D", n: "Ab video", sets: "1", reps: "Video", load: "", rest: "", notes: "Follow along with the video, then check it off." } ] });
         out.push({ id: "w" + w + "-day-2", week: String(w), day: "Day 2", title: "Upper", items: [
           { block: "A", n: "Bench press", sets: "4", reps: "6", load: pct[w - 1], rest: "2 min", notes: "" },
           { block: "B1", n: "DB row", sets: "3", reps: "10", load: "50", rest: "", notes: "" },
@@ -1294,6 +1308,16 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
   // How-to steps and form cues: tap an exercise name to see them. First pattern that matches wins,
   // so specific names come before general ones.
   var CUES = [
+    // Specific versions first: the first match wins.
+    [/band lat pulldown/i, ["Anchor the band high: top of a door, rack or pull-up bar.", "Kneel facing it, arms straight up, a little tension in the band.", "Pull your elbows down to your ribs and squeeze your lats, then let your arms rise slowly."]],
+    [/band face pull/i, ["Anchor the band at eye height and step back until it's tight.", "Pull toward your forehead with elbows high, hands finishing beside your ears.", "Squeeze between your shoulder blades, then return slowly."]],
+    [/front squat/i, ["A dumbbell on each shoulder, elbows pointing forward and up.", "Brace, then sit straight down between your heels, chest tall.", "Keep your elbows up the whole way and drive the floor away to stand."]],
+    [/glute bridge/i, ["Lie on your back, knees bent, feet flat and hip-width; dumbbell on your hips.", "Push through your heels and lift your hips until knees, hips and shoulders line up.", "Squeeze your glutes for a second at the top; don't arch your low back."]],
+    [/shoulder tap/i, ["Top of a push-up, hands under shoulders, feet wide.", "Lift one hand to tap the opposite shoulder, then switch.", "Keep your hips still: no rocking side to side."]],
+    [/kb deadlift|kettlebell deadlift/i, ["Bell between your feet, feet hip-width.", "Push your hips back, flat back, grab the handle with both hands.", "Stand up by driving your hips forward and squeezing your glutes. This is the motion behind the swing."]],
+    [/cardio warm-up/i, ["Easy pace on any machine: you should be able to talk.", "Build a little over the 5 minutes.", "Aim to be warm and a bit sweaty before the first lift."]],
+    [/easy cardio/i, ["Steady pace you could hold a conversation at.", "Any machine, or a jog or walk.", "This is recovery, not a workout: keep it easy."]],
+    [/sprints?\b|intervals?/i, ["Hard parts: as fast as you can keep good form. Easy parts: slow right down and breathe.", "Use whatever's there: bike, rower, treadmill, stairs or elliptical.", "Count the rounds; a timer or the machine's interval setting helps."]],
     [/dead ?bug/i, ["Lie on your back, arms straight up, knees bent at 90° over your hips.", "Press your low back flat into the floor and keep it there.", "Slowly lower the opposite arm and leg toward the floor, exhaling fully.", "Return and switch sides. If your back arches, don't reach as far."]],
     [/bird ?dog/i, ["On hands and knees, hands under shoulders, knees under hips.", "Reach one arm forward and the opposite leg back until both are straight.", "Hips stay level, like a glass of water is on your back. Pause, return, switch."]],
     [/hollow (hold|rock)/i, ["Lie on your back and press your low back into the floor.", "Lift your shoulders and legs a few inches off the floor, arms overhead or by your sides.", "Hold the banana shape. Bend your knees to make it easier; never let your back arch."]],
@@ -1346,6 +1370,65 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
   ];
   function cuesFor(name) { for (var i = 0; i < CUES.length; i++) if (CUES[i][0].test(name)) return CUES[i][1]; return null; }
 
+  // ---------- Ab videos ----------
+  // A program row named "Ab video" gets a YouTube player. With no link on the row, the app picks one of these,
+  // matched to the workout's size: bigger workouts get a shorter video. A YouTube link in the row's Notes plays that video instead.
+  var AB_VIDEOS = [
+    { id: "Kd8ZU9NUbRA", title: "Lower abs", min: 5 },
+    { id: "BdhqubW1GJE", title: "Full ab workout", min: 10 },
+    { id: "kWodISSgIqI", title: "Total abs", min: 5 },
+    { id: "QUW5juyHLkg", title: "Flat abs", min: 10 },
+    { id: "0_nKiv0i7PA", title: "Abs, no equipment", min: 5 },
+    { id: "DEp8QqxQ6U8", title: "Intense core burn", min: 5 },
+    { id: "huqPu2epmcw", title: "Advanced abs", min: 8 }
+  ];
+  var YT_RE = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{11})/;
+  var absPick = {};
+  function isVideoItem(it) { return /^ab video$/i.test(String(it.n).trim()) || YT_RE.test(it.notes || ""); }
+  function absDefault(s) {
+    var sets = 0; s.items.forEach(function (x) { if (!isVideoItem(x)) sets += x.sets || 0; });
+    var m = Math.round(sets * 2.5), lo = 0, hi = 10;
+    if (m >= 55) hi = 5; else if (m >= 45) hi = 8; else lo = 8;
+    var pool = []; AB_VIDEOS.forEach(function (v, i) { if (v.min >= lo && v.min <= hi) pool.push(i); });
+    var h = 7; for (var i = 0; i < s.id.length; i++) h = (h * 31 + s.id.charCodeAt(i)) % 100003;
+    h = (h * 2654435761) % 4294967296;
+    return pool[h % pool.length];
+  }
+  function absPlayer(s, it) {
+    var box = el("div", "abs");
+    var m = YT_RE.exec(it.notes || ""), v, cur = -1;
+    if (m) v = { id: m[1], title: "Video", min: 0 };
+    else { cur = absPick[s.id] != null ? absPick[s.id] : absDefault(s); v = AB_VIDEOS[cur]; }
+    var frame = el("button", "absvid"); frame.type = "button";
+    frame.setAttribute("aria-label", "Play " + v.title);
+    var img = el("img"); img.src = "https://i.ytimg.com/vi/" + v.id + "/hqdefault.jpg"; img.alt = ""; img.loading = "lazy";
+    frame.appendChild(img); frame.appendChild(el("span", "absplay", "▶"));
+    frame.addEventListener("click", function () {
+      var f = document.createElement("iframe");
+      f.src = "https://www.youtube-nocookie.com/embed/" + v.id + "?autoplay=1&playsinline=1&rel=0";
+      f.title = v.title; f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen"; f.allowFullscreen = true;
+      f.className = "absframe"; frame.replaceWith(f);
+    });
+    box.appendChild(frame);
+    var cap = el("div", "abscap");
+    cap.appendChild(el("span", "abst", v.min ? v.title + " · " + v.min + " min" : ""));
+    var yt = el("a", "absyt", "Open in YouTube"); yt.href = "https://youtu.be/" + v.id; yt.target = "_blank"; yt.rel = "noopener";
+    cap.appendChild(yt);
+    box.appendChild(cap);
+    if (cur >= 0) {
+      var more = el("details", "absmore");
+      more.appendChild(el("summary", null, "Other ab videos"));
+      AB_VIDEOS.forEach(function (o, i) {
+        if (i === cur) return;
+        var b = el("button", "absopt", o.title + " · " + o.min + " min"); b.type = "button";
+        b.addEventListener("click", function () { absPick[s.id] = i; render(); var a = document.querySelector(".abs"); if (a) a.scrollIntoView({ block: "center" }); });
+        more.appendChild(b);
+      });
+      box.appendChild(more);
+    }
+    return box;
+  }
+
   function renderItem(s, it) {
     var box = el("section", "item");
     var nm = el("div", "iname");
@@ -1362,7 +1445,10 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     box.appendChild(nm);
     if (cbox) box.appendChild(cbox);
     box.appendChild(el("div", "rx", it.rx));
-    if (it.notes) box.appendChild(el("div", "cnote", it.notes));
+    var vid = isVideoItem(it);
+    var noteTxt = vid ? String(it.notes || "").replace(YT_RE, "").replace(/https?:\/\/\S*/g, "").trim() : it.notes;
+    if (noteTxt) box.appendChild(el("div", "cnote", noteTxt));
+    if (vid) { box.appendChild(absPlayer(s, it)); box.classList.add("vid"); }
 
     var past = historyOf(it.n, s.id), lc = el("div", "lastcard");
     if (past.length) {

@@ -619,7 +619,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "37 · Nov 26";
+  var APP_VERSION = "38 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -872,7 +872,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
         { t: "D", name: "Conditioning · 15–20 min", rest: "", items: [
           { k: "cond", n: "1 min on, 1 min off", rx: "", note: "Alternate Echo bike and Ski erg. Hard but steady on the work minutes.", log: "score", ph: "total cals", timer: { type: "intervals", work: 60, rest: 60, rounds: 10, labels: ["Echo bike", "Ski erg"], restLabel: "Off" } } ] } ] }
   ];
-  function extraById(id) { for (var i = 0; i < EXTRA.length; i++) if (EXTRA[i].id === id) return withAbs(EXTRA[i]); return null; }
+  function extraById(id) { for (var i = 0; i < EXTRA.length; i++) if (EXTRA[i].id === id) return withAbs(EXTRA[i], EXTRA[i].warm); return null; }
 
   var DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -1245,11 +1245,13 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     return sv;
   }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  function sessionFor(w, lift) { var s = SESS[lift][w - 1]; if (s && s.travel) return withAbs(TRAVEL); return withAbs(s); }
+  function sessionFor(w, lift) { var s = SESS[lift][w - 1]; if (s && s.travel) return withAbs(TRAVEL); return withAbs(s, (s && s.warm) || (LIFT_META[lift] && LIFT_META[lift].warm)); }
   // Every workout ends with an ab video (see AB_VIDEOS). It's a normal check-off item, so it logs and syncs like the rest.
   function nextLetter(t) { var c = String(t || "D").charAt(0); return /[A-Y]/.test(c) ? String.fromCharCode(c.charCodeAt(0) + 1) : "Z"; }
-  function withAbs(s) {
+  // The warm-up is a check-off block at the start ("W"), so it's as hard to miss as the lifts.
+  function withAbs(s, warm) {
     if (!s || s.off || !s.blocks || !s.blocks.length || s._abs) return s;
+    if (warm && !s.travel) s.blocks.unshift({ t: "W", name: "Warm-up", items: [{ k: "warmup", n: "Warm-up", rx: "", note: warm }] });
     var blk = { name: "Abs", items: [{ k: "abs", n: "Ab video", rx: "", note: "" }] };
     var end = s.blocks[s.blocks.length - 1];
     // Before a closing recovery block (sauna), otherwise last.
@@ -1684,12 +1686,6 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     head.appendChild(runBox(id));
     card.appendChild(head);
 
-    if (!isTravel) {
-      var d = el("details", "warm"); d.open = true;
-      d.appendChild(el("summary", null, "Warm-up"));
-      d.appendChild(el("p", null, (s && s.warm) || meta.warm));
-      card.appendChild(d);
-    }
     if (s.test) card.appendChild(el("div", "callout test", "Test day. Rest fully between singles. A missed rep costs more than a skipped attempt."));
     if (s.note) card.appendChild(el("div", "callout", s.note));
 
