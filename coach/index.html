@@ -319,7 +319,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "30";
+  var VERSION = "31";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -442,7 +442,8 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       per.push({ reps: rt, rFill: isNaN(rn) ? null : rn, pct: p, w: w, text: p == null && w == null ? lt : "",
         target: (rt || "") + (p != null ? " @ " + p + "%" : w != null ? " @ " + w + " lb" : lt ? " @ " + lt : "") });
     }
-    var rx = sets + " × " + (it.reps || "—") + (it.load ? " · " + it.load + (isPct && max ? " of " + max : "") : "") + (it.rest ? " · Rest " + it.rest : "");
+    // The line under the name: sets × reps and rest. The weight lives in the set rows, so it's left out here.
+    var rx = sets + " × " + (it.reps || "—") + (it.rest ? " · Rest " + it.rest : "");
     return { block: it.block || "", n: it.n, notes: it.notes || "", rest: restSecs(it.rest), sets: sets, per: per, rx: rx };
   }
   function model() {
