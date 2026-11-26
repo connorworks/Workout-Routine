@@ -244,6 +244,16 @@ details.warm { border-bottom: 1px solid var(--line); background: var(--sunk); }
 details.warm summary { padding: 12px 16px; cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; min-height: 24px; }
 details.warm p { padding: 0 16px 14px; font-size: 15px; }
 
+.abs { padding: 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.absvid { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: none; border-radius: 12px; overflow: hidden; background: #000; cursor: pointer; }
+.absvid img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .9; }
+.absplay { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; padding-left: 4px; }
+.absframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; background: #000; }
+.abscap { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 15px; }
+.abst { font-weight: 700; }
+.absyt { color: var(--accent, #1E4FD6); font-weight: 600; white-space: nowrap; }
+.absmore summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 4px 0; }
+.absopt { display: block; width: 100%; text-align: left; min-height: 44px; padding: 10px 12px; margin-top: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); color: var(--ink); font: inherit; cursor: pointer; }
 .block { padding: 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
 .bh { display: flex; align-items: center; gap: 10px; }
 .letter { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 19px; background: var(--ink); color: var(--bg); }
@@ -255,7 +265,8 @@ details.warm p { padding: 0 16px 14px; font-size: 15px; }
 #session { background: var(--sunk); }
 #session .shead, #session .callout:not(.test) { background: var(--surface); }
 #session .block { background: var(--surface); margin: 12px 12px 0; border: 1px solid var(--line); border-radius: 14px; }
-#session .block + .finish { margin-top: 12px; border-top: 1px solid var(--line); }
+#session .block + .finish, #session .abs + .finish { margin-top: 12px; border-top: 1px solid var(--line); }
+#session .abs { background: var(--surface); margin: 12px 12px 0; border: 1px solid var(--line); border-radius: 14px; }
 .iname { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .iname .nm { font-weight: 700; font-size: 17px; }
 .iname .rx { font-family: var(--mono); font-size: 14px; }
@@ -609,7 +620,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "35 · Nov 25";
+  var APP_VERSION = "36 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1572,6 +1583,64 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     return b;
   }
 
+  // ---------- Ab videos at the end of each workout ----------
+  // One featured per workout, rotating so back-to-back workouts get different ones; the rest are a tap away.
+  var AB_VIDEOS = [
+    { id: "Kd8ZU9NUbRA", title: "Lower abs", min: 5 },
+    { id: "BdhqubW1GJE", title: "Full ab workout", min: 10 },
+    { id: "kWodISSgIqI", title: "Total abs", min: 5 },
+    { id: "QUW5juyHLkg", title: "Flat abs", min: 10 },
+    { id: "0_nKiv0i7PA", title: "Abs, no equipment", min: 5 },
+    { id: "DEp8QqxQ6U8", title: "Intense core burn", min: 5 },
+    { id: "huqPu2epmcw", title: "Advanced abs", min: 8 }
+  ];
+  var absPick = {};
+  function absDefault(pick, id) {
+    if (!pick.extra) return ((pick.week - 1) * 4 + (pick.lift - 1)) % AB_VIDEOS.length;
+    var h = 0; for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 997;
+    return h % AB_VIDEOS.length;
+  }
+  function absCard(pick, id) {
+    var box = el("section", "abs");
+    var hd = el("div", "bh");
+    hd.appendChild(el("div", "letter", "+"));
+    var ht = el("div");
+    ht.appendChild(el("div", "bt", "Abs"));
+    ht.appendChild(el("div", "rest", "Optional · TIFF x DAN on YouTube"));
+    hd.appendChild(ht);
+    box.appendChild(hd);
+    var cur = absPick[id] != null ? absPick[id] : absDefault(pick, id);
+    var v = AB_VIDEOS[cur];
+    var frame = el("button", "absvid"); frame.type = "button";
+    frame.setAttribute("aria-label", "Play " + v.title + ", " + v.min + " minutes");
+    var img = el("img"); img.src = "https://i.ytimg.com/vi/" + v.id + "/hqdefault.jpg"; img.alt = ""; img.loading = "lazy";
+    frame.appendChild(img);
+    frame.appendChild(el("span", "absplay", "▶"));
+    frame.addEventListener("click", function () {
+      var f = document.createElement("iframe");
+      f.src = "https://www.youtube-nocookie.com/embed/" + v.id + "?autoplay=1&playsinline=1&rel=0";
+      f.title = v.title; f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen"; f.allowFullscreen = true;
+      f.className = "absframe";
+      frame.replaceWith(f);
+    });
+    box.appendChild(frame);
+    var cap = el("div", "abscap");
+    cap.appendChild(el("span", "abst", v.title + " · " + v.min + " min"));
+    var yt = el("a", "absyt", "Open in YouTube"); yt.href = "https://youtu.be/" + v.id; yt.target = "_blank"; yt.rel = "noopener";
+    cap.appendChild(yt);
+    box.appendChild(cap);
+    var more = el("details", "absmore");
+    more.appendChild(el("summary", null, "Other ab videos"));
+    AB_VIDEOS.forEach(function (o, i) {
+      if (i === cur) return;
+      var b = el("button", "absopt", o.title + " · " + o.min + " min"); b.type = "button";
+      b.addEventListener("click", function () { absPick[id] = i; render(); var n = $("session"); if (n) { var a = n.querySelector(".abs"); if (a) a.scrollIntoView({ block: "start" }); } });
+      more.appendChild(b);
+    });
+    box.appendChild(more);
+    return box;
+  }
+
   function renderSession(pick) {
     var ex = pick.extra ? extraById(pick.extra) : null;
     var w = ex ? null : WEEKS[pick.week - 1];
@@ -1619,6 +1688,8 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       b.items.forEach(function (it, idx) { blk.appendChild(renderItem(it, idx, b, id)); });
       card.appendChild(blk);
     });
+
+    card.appendChild(absCard(pick, id));
 
     var fin = el("div", "finish");
     var ta = el("textarea");
