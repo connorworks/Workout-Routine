@@ -180,6 +180,12 @@ p { margin: 0; }
 .runrow { cursor: default; align-items: center; }
 .rundel { border: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 4px 0 4px 8px; }
 .rundel[data-c] { color: var(--test); font-weight: 700; }
+.woff { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.woff p { margin: 0; }
+.woffbtns { display: flex; gap: 10px; }
+.woff .btn { min-height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; padding: 0 14px; }
+.woff .btn:not(.ghost) { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.woffbtns .btn { flex: 1; }
 .syncdlg-btns .go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
 .app { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px calc(150px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; }
@@ -248,6 +254,16 @@ details.warm { border-bottom: 1px solid var(--line); background: var(--sunk); }
 details.warm summary { padding: 12px 16px; cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; min-height: 24px; }
 details.warm p { padding: 0 16px 14px; font-size: 15px; }
 
+.abs { display: flex; flex-direction: column; gap: 10px; }
+.absvid { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: none; border-radius: 12px; overflow: hidden; background: #000; cursor: pointer; }
+.absvid img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: .9; }
+.absplay { position: absolute; inset: 0; margin: auto; width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; padding-left: 4px; }
+.absframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; background: #000; }
+.abscap { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 15px; }
+.abst { font-weight: 700; }
+.absyt { color: var(--accent, #1E4FD6); font-weight: 600; white-space: nowrap; }
+.absmore summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 4px 0; }
+.absopt { display: block; width: 100%; text-align: left; min-height: 44px; padding: 10px 12px; margin-top: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); color: var(--ink); font: inherit; cursor: pointer; }
 .block { padding: 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
 .bh { display: flex; align-items: center; gap: 10px; }
 .letter { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 19px; background: var(--ink); color: var(--bg); }
@@ -613,7 +629,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "35 · Nov 25";
+  var APP_VERSION = "39 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -866,7 +882,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
         { t: "D", name: "Conditioning · 15–20 min", rest: "", items: [
           { k: "cond", n: "1 min on, 1 min off", rx: "", note: "Alternate Echo bike and Ski erg. Hard but steady on the work minutes.", log: "score", ph: "total cals", timer: { type: "intervals", work: 60, rest: 60, rounds: 10, labels: ["Echo bike", "Ski erg"], restLabel: "Off" } } ] } ] }
   ];
-  function extraById(id) { for (var i = 0; i < EXTRA.length; i++) if (EXTRA[i].id === id) return EXTRA[i]; return null; }
+  function extraById(id) { for (var i = 0; i < EXTRA.length; i++) if (EXTRA[i].id === id) return withAbs(EXTRA[i], EXTRA[i].warm); return null; }
 
   var DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -1012,7 +1028,68 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     Object.keys(TARGETS).forEach(function (k) { delete TARGETS[k]; });
     Object.keys(g.targets).forEach(function (k) { TARGETS[k] = g.targets[k]; });
     programFrom = "sheet";
+    applyWeekOverride();
     return true;
+  }
+
+  // ---------- Week off ----------
+  // Taking a week off moves that week and every week after it 7 days later. The new start dates are kept on the
+  // phone and sent to the Sheet's "Program · Weeks" tab (sync script v7+); once the Sheet has them, the phone copy goes.
+  var WOFF_KEY = "ptb-week-starts";
+  function applyWeekOverride() {
+    var o = recall(WOFF_KEY);
+    if (!o || o.block !== BLOCK || !o.starts) return false;
+    var same = true, changed = false;
+    WEEKS.forEach(function (w) {
+      var st = o.starts[w.n];
+      if (!st) return;
+      if (w.start !== st) { same = false; w.start = st; changed = true; }
+    });
+    if (same && o.synced) store(WOFF_KEY, null); // the Sheet caught up
+    return changed;
+  }
+  function shiftWeeks(from, days) {
+    var starts = {};
+    WEEKS.forEach(function (w) {
+      if (w.n >= from) w.start = iso(addDays(parseISO(w.start), days));
+      starts[w.n] = w.start;
+    });
+    store(WOFF_KEY, { block: BLOCK, starts: starts, synced: false });
+    if (window.WRSync) window.WRSync.mark("weeks", "starts");
+    nowPick = pickNow();
+    render();
+  }
+  function weekStartsOut() {
+    var out = []; WEEKS.forEach(function (w) { out.push({ week: w.n, start: w.start }); });
+    return { block: BLOCK, starts: out };
+  }
+  function weekOffDone() { var o = recall(WOFF_KEY); if (o) { o.synced = true; store(WOFF_KEY, o); } }
+  function weekOffBox(w) {
+    var box = el("div", "woff");
+    var end = addDays(parseISO(w.start), 6), prev = WEEKS[w.n - 2];
+    var gap = prev && Math.round((parseISO(w.start) - parseISO(prev.start)) / 86400000) >= 14;
+    var started = [1, 2, 3, 4].some(function (l) { var lg = logs[docId(w.n, l)]; return lg && (lg.done || lg.items && Object.keys(lg.items).length); });
+    if (gap && w.start > today) {
+      var ub = el("button", "linkbtn", "Undo the week off before Week " + w.n); ub.type = "button";
+      ub.addEventListener("click", function () { shiftWeeks(w.n, -7); });
+      box.appendChild(ub);
+    }
+    if (iso(end) < today || started) return box.childNodes.length ? box : null;
+    var last = WEEKS[WEEKS.length - 1];
+    var tb = el("button", "btn ghost", "Take this week off"); tb.type = "button";
+    tb.addEventListener("click", function () {
+      box.innerHTML = "";
+      var newEnd = addDays(parseISO(last.start), 13);
+      box.appendChild(el("p", null, "Week " + w.n + (w.n < last.n ? " through Week " + last.n : "") + " move a week later. Week " + w.n +
+        " starts " + longDay(addDays(parseISO(w.start), 7)) + ", and the block ends " + longDay(newEnd) + "."));
+      var row = el("div", "woffbtns");
+      var no = el("button", "btn ghost", "Cancel"); no.type = "button"; no.addEventListener("click", function () { render(); });
+      var yes = el("button", "btn", "Push it back"); yes.type = "button";
+      yes.addEventListener("click", function () { shiftWeeks(w.n, 7); weekSel = w.n; render(); });
+      row.appendChild(no); row.appendChild(yes); box.appendChild(row);
+    });
+    box.appendChild(tb);
+    return box;
   }
   // From the sync: the program as read from the Sheet. Kept on the phone so the next open starts with it.
   function receiveProgram(P) {
@@ -1239,7 +1316,22 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     return sv;
   }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  function sessionFor(w, lift) { var s = SESS[lift][w - 1]; if (s && s.travel) return TRAVEL; return s; }
+  function sessionFor(w, lift) { var s = SESS[lift][w - 1]; if (s && s.travel) return withAbs(TRAVEL); return withAbs(s, (s && s.warm) || (LIFT_META[lift] && LIFT_META[lift].warm)); }
+  // Every workout ends with an ab video (see AB_VIDEOS). It's a normal check-off item, so it logs and syncs like the rest.
+  function nextLetter(t) { var c = String(t || "D").charAt(0); return /[A-Y]/.test(c) ? String.fromCharCode(c.charCodeAt(0) + 1) : "Z"; }
+  // The warm-up is a check-off block at the start ("W"), so it's as hard to miss as the lifts.
+  function withAbs(s, warm) {
+    if (!s || s.off || !s.blocks || !s.blocks.length || s._abs) return s;
+    if (warm && !s.travel) s.blocks.unshift({ t: "W", name: "Warm-up", items: [{ k: "warmup", n: "Warm-up", rx: "", note: warm }] });
+    var blk = { name: "Abs", items: [{ k: "abs", n: "Ab video", rx: "", note: "" }] };
+    var end = s.blocks[s.blocks.length - 1];
+    // Before a closing recovery block (sauna), otherwise last.
+    var rec = /recovery|sauna|cool/i.test(end.name || "") || end.items.every(function (it) { return /sauna/i.test(it.n || ""); });
+    if (rec && s.blocks.length > 1) { blk.t = end.t; s.blocks.splice(s.blocks.length - 1, 0, blk); end.t = nextLetter(end.t); }
+    else { blk.t = nextLetter(end.t); s.blocks.push(blk); }
+    s._abs = true;
+    return s;
+  }
   function docId(w, l) { return "w" + w + "-l" + l; }
   function idOf(p) { return p.extra ? p.extra : docId(p.week, p.lift); }
   // A lift can be moved to another day of its week; the move is saved on its log as "moved".
@@ -1364,7 +1456,10 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     for (var x = 0; x < EXTRA.length; x++) if (EXTRA[x].date === today) {
       var xc = el("span", "chip lift"); xc.appendChild(el("span", "k", "Extra")); xc.appendChild(document.createTextNode(EXTRA[x].title)); chips.appendChild(xc);
     }
-    if (!te) {
+    var nextWk = null; WEEKS.forEach(function (w) { if (!nextWk && w.start > today) nextWk = w; });
+    if (!te && nextWk && today > WEEKS[0].start) {
+      chips.appendChild(el("span", "chip", "Week off. Week " + nextWk.n + " starts " + parseISO(nextWk.start).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })));
+    } else if (!te) {
       chips.appendChild(el("span", "chip", today < WEEKS[0].start ? "The block starts " + parseISO(WEEKS[0].start).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }) : "The block is finished. Time to build the next one."));
     } else {
       te.ents.forEach(function (e) {
@@ -1576,6 +1671,69 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     return b;
   }
 
+  // ---------- Ab videos at the end of each workout ----------
+  // One featured per workout, matched to how long the workout is; the rest are a tap away.
+  var AB_VIDEOS = [
+    { id: "Kd8ZU9NUbRA", title: "Lower abs", min: 5 },
+    { id: "BdhqubW1GJE", title: "Full ab workout", min: 10 },
+    { id: "kWodISSgIqI", title: "Total abs", min: 5 },
+    { id: "QUW5juyHLkg", title: "Flat abs", min: 10 },
+    { id: "0_nKiv0i7PA", title: "Abs, no equipment", min: 5 },
+    { id: "DEp8QqxQ6U8", title: "Intense core burn", min: 5 },
+    { id: "huqPu2epmcw", title: "Advanced abs", min: 8 }
+  ];
+  var absPick = {};
+  // Longer or harder workouts get a shorter ab video: 55+ min or a test day -> 5 min; 45-54 min -> 5 or 8 min;
+  // under 45 min -> 8 or 10 min. Within that, the pick is random but fixed for each workout.
+  function absDefault(id) {
+    var mm = id.match(/^w(\d+)-l(\d+)$/), s = sessDef(id), meta = mm ? (s && s.travel ? TRAVEL : LIFT_META[+mm[2]]) : s;
+    var m = parseInt(String((meta && meta.dur) || "").replace(/[^\d]/g, ""), 10);
+    if (!(m > 0) && s && s.blocks) { var n = 0; s.blocks.forEach(function (b) { b.items.forEach(function (it) { n += expandSets(it).length; }); }); m = Math.round(n * 2.5); }
+    var lo = 0, hi = 10;
+    if ((s && s.test) || m >= 55) hi = 5;
+    else if (m >= 45) hi = 8;
+    else lo = 8;
+    var pool = [];
+    AB_VIDEOS.forEach(function (v, i) { if (v.min >= lo && v.min <= hi) pool.push(i); });
+    if (!pool.length) pool = AB_VIDEOS.map(function (v, i) { return i; });
+    var h = 7; for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 100003;
+    h = (h * 2654435761) % 4294967296;
+    return pool[h % pool.length];
+  }
+  function absPlayer(id) {
+    var box = el("div", "abs");
+    var cur = absPick[id] != null ? absPick[id] : absDefault(id);
+    var v = AB_VIDEOS[cur];
+    var frame = el("button", "absvid"); frame.type = "button";
+    frame.setAttribute("aria-label", "Play " + v.title + ", " + v.min + " minutes");
+    var img = el("img"); img.src = "https://i.ytimg.com/vi/" + v.id + "/hqdefault.jpg"; img.alt = ""; img.loading = "lazy";
+    frame.appendChild(img);
+    frame.appendChild(el("span", "absplay", "▶"));
+    frame.addEventListener("click", function () {
+      var f = document.createElement("iframe");
+      f.src = "https://www.youtube-nocookie.com/embed/" + v.id + "?autoplay=1&playsinline=1&rel=0";
+      f.title = v.title; f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen"; f.allowFullscreen = true;
+      f.className = "absframe";
+      frame.replaceWith(f);
+    });
+    box.appendChild(frame);
+    var cap = el("div", "abscap");
+    cap.appendChild(el("span", "abst", v.title + " · " + v.min + " min"));
+    var yt = el("a", "absyt", "Open in YouTube"); yt.href = "https://youtu.be/" + v.id; yt.target = "_blank"; yt.rel = "noopener";
+    cap.appendChild(yt);
+    box.appendChild(cap);
+    var more = el("details", "absmore");
+    more.appendChild(el("summary", null, "Other ab videos"));
+    AB_VIDEOS.forEach(function (o, i) {
+      if (i === cur) return;
+      var b = el("button", "absopt", o.title + " · " + o.min + " min"); b.type = "button";
+      b.addEventListener("click", function () { absPick[id] = i; render(); var n = $("session"); if (n) { var a = n.querySelector(".abs"); if (a) a.scrollIntoView({ block: "center" }); } });
+      more.appendChild(b);
+    });
+    box.appendChild(more);
+    return box;
+  }
+
   function renderSession(pick) {
     var ex = pick.extra ? extraById(pick.extra) : null;
     var w = ex ? null : WEEKS[pick.week - 1];
@@ -1602,12 +1760,6 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     head.appendChild(runBox(id));
     card.appendChild(head);
 
-    if (!isTravel) {
-      var d = el("details", "warm"); d.open = true;
-      d.appendChild(el("summary", null, "Warm-up"));
-      d.appendChild(el("p", null, (s && s.warm) || meta.warm));
-      card.appendChild(d);
-    }
     if (s.test) card.appendChild(el("div", "callout test", "Test day. Rest fully between singles. A missed rep costs more than a skipped attempt."));
     if (s.note) card.appendChild(el("div", "callout", s.note));
 
@@ -1623,6 +1775,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       b.items.forEach(function (it, idx) { blk.appendChild(renderItem(it, idx, b, id)); });
       card.appendChild(blk);
     });
+
 
     var fin = el("div", "finish");
     var ta = el("textarea");
@@ -1938,6 +2091,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     box.appendChild(nm);
     if (cues) box.appendChild(cbox);
     if (it.note) box.appendChild(el("p", "inote", it.note));
+    if (it.k === "abs") box.appendChild(absPlayer(id));
     if (perSet(it)) {
       box.appendChild(setRows(it, idx, b, id));
     } else {
@@ -2498,6 +2652,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     pad.appendChild(el("h2", null, "Week " + w.n));
     pad.appendChild(el("span", "pill" + (w.test ? " test" : ""), w.phase + " week"));
     pad.appendChild(el("p", "muted", w.intent));
+    var wob = weekOffBox(w); if (wob) pad.appendChild(wob);
     card.appendChild(pad);
     var days = el("div", "days");
     var start = parseISO(w.start);
@@ -3150,7 +3305,8 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     lg.updatedAt = up && !isNaN(up) ? up.toISOString() : new Date().toISOString();
     return lg;
   }
-  window.WR = { block: BLOCK, rows: sheetRows, bodyweightRow: bodyweightRow, fromSheet: fromSheet, program: receiveProgram, maxesOut: maxesOut, maxes: receiveMaxes };
+  window.WR = { block: BLOCK, rows: sheetRows, bodyweightRow: bodyweightRow, fromSheet: fromSheet, program: receiveProgram, maxesOut: maxesOut, maxes: receiveMaxes,
+    weekStartsOut: weekStartsOut, weekOffDone: weekOffDone };
 
   // ---------- Staying current ----------
   // When the app comes back on screen (no timers), it checks for a newer version of itself and reloads right then,
@@ -3185,6 +3341,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var saved = recall(PROG_KEY) || window.STARTER_PROGRAM;
   // The sheet's weeks can differ from the built-in ones, so pick this week again with them.
   if (saved && applyProgram(saved)) { nowPick = pickNow(); weekSel = nowPick.week || 1; if (!recall(PROG_KEY)) programFrom = "starter"; }
+  else if (applyWeekOverride()) { nowPick = pickNow(); weekSel = nowPick.week || 1; }
   var ui0 = null;
   try { ui0 = JSON.parse(sessionStorage.getItem(UIKEY) || "null"); sessionStorage.removeItem(UIKEY); } catch (e) {}
   if (ui0) {
@@ -3291,7 +3448,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   function secOf(t) { if (typeof t === "number") return t > 0 && t < 1 ? Math.round(t * 86400) : t; var p = String(t || "").split(":").map(Number); return p.reduce(function (a, b) { return a * 60 + (b || 0); }, 0); }
   function schedule(ms) { clearTimeout(timer); timer = setTimeout(flush, ms); }
   function mark(col, id) {
-    if (col !== "logs" && col !== "bodyweight" && col !== "maxes" && col !== "runs") return;
+    if (col !== "logs" && col !== "bodyweight" && col !== "maxes" && col !== "runs" && col !== "weeks") return;
     pending[col + "/" + id] = stampOf();
     put(PEND, pending);
     show();
@@ -3309,6 +3466,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       var i = k.indexOf("/"), col = k.slice(0, i), id = k.slice(i + 1), doc = (d[col] || {})[id];
       sent[k] = pending[k];
       if (col === "maxes") { try { body.maxes = window.WR.maxesOut(); } catch (e) {} return; }
+      if (col === "weeks") { try { body.weekStarts = window.WR.weekStartsOut(); } catch (e) {} return; }
       if (!doc) return;
       if (col === "runs") {
         var pace = doc.mi > 0 && doc.sec > 0 ? Math.round(doc.sec / doc.mi) : 0;
@@ -3329,7 +3487,12 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
         busy = false;
         if (res && res.ok) {
           // A sync script older than v6 ignores runs: they wait on the phone until the script is updated.
-          Object.keys(sent).forEach(function (k) { if (pending[k] === sent[k] && (k.indexOf("runs/") !== 0 || res.runs != null)) delete pending[k]; });
+          Object.keys(sent).forEach(function (k) {
+            if (pending[k] !== sent[k]) return;
+            if (k.indexOf("runs/") === 0 && res.runs == null) return;
+            if (k.indexOf("weeks/") === 0) { if (res.weekStarts == null) return; try { window.WR.weekOffDone(); } catch (e) {} }
+            delete pending[k];
+          });
           put(PEND, pending); put(LAST, new Date().toISOString());
           state = "";
         } else if (res && res.error === "passcode") {

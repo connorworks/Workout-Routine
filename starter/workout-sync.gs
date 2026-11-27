@@ -1,4 +1,4 @@
-// Workout Routine sync (starter kit, from v6).
+// Workout Routine sync (starter kit, from v7).
 // Paste this into your Sheet's Apps Script editor (Extensions > Apps Script), set PASSCODE, then deploy
 // as a web app: Execute as Me, Who has access Anyone. See README.md in the starter folder.
 // Receives sessions from the Workout Routine app and writes them to this Sheet,
@@ -30,7 +30,9 @@ function doPost(e) {
     if (Array.isArray(body.maxes)) writeMaxes(ss, body.maxes);
     const runs = body.runs || [];
     runs.forEach(function (r) { writeRun(ss, r); });
-    return reply({ ok: true, sessions: sessions.length, bodyweight: weights.length, runs: runs.length });
+    const res = { ok: true, sessions: sessions.length, bodyweight: weights.length, runs: runs.length };
+    if (body.weekStarts) res.weekStarts = writeWeekStarts(ss, body.weekStarts);
+    return reply(res);
   } catch (err) {
     return reply({ ok: false, error: String(err) });
   } finally {
@@ -141,6 +143,31 @@ function readRuns(ss) {
   if (!sh || sh.getLastRow() < 2) return [];
   return sh.getRange(2, 1, sh.getLastRow() - 1, 5).getDisplayValues()
     .filter(function (r) { return r[1]; });
+}
+
+// A week off from the app: new start dates for the block's weeks. w = { block, starts: [{ week, start: 'yyyy-mm-dd' }] }.
+// Only the Starts cells of that block's rows change.
+function writeWeekStarts(ss, w) {
+  const sh = ss.getSheetByName('Program · Weeks');
+  if (!sh || sh.getLastRow() < 2 || !w || !Array.isArray(w.starts)) return 0;
+  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  const cB = head.findIndex(function (h) { return /^block/.test(h); }), cW = head.findIndex(function (h) { return /^week/.test(h); }),
+    cS = head.findIndex(function (h) { return /^start/.test(h); });
+  if (cW < 0 || cS < 0) return 0;
+  const want = {};
+  w.starts.forEach(function (x) { if (/^\d{4}-\d{2}-\d{2}$/.test(String(x.start))) want[String(x.week)] = String(x.start); });
+  const v = sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).getDisplayValues();
+  let n = 0, block = '';
+  v.forEach(function (r, i) {
+    if (cB >= 0 && r[cB]) block = r[cB];
+    if (cB >= 0 && w.block && block && block !== w.block) return;
+    const st = want[String(parseInt(r[cW], 10))];
+    if (!st) return;
+    const p = st.split('-').map(Number);
+    sh.getRange(i + 2, cS + 1).setValue(new Date(p[0], p[1] - 1, p[2]));
+    n++;
+  });
+  return n;
 }
 
 function reply(obj) {

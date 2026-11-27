@@ -176,6 +176,12 @@ p { margin: 0; }
 .runrow { cursor: default; align-items: center; }
 .rundel { border: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 4px 0 4px 8px; }
 .rundel[data-c] { color: var(--test); font-weight: 700; }
+.woff { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.woff p { margin: 0; }
+.woffbtns { display: flex; gap: 10px; }
+.woff .btn { min-height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; padding: 0 14px; }
+.woff .btn:not(.ghost) { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.woffbtns .btn { flex: 1; }
 .syncdlg-btns .go { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
 .app { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px calc(150px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; }
@@ -619,7 +625,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "38 · Nov 26";
+  var APP_VERSION = "39 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1018,7 +1024,68 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     Object.keys(TARGETS).forEach(function (k) { delete TARGETS[k]; });
     Object.keys(g.targets).forEach(function (k) { TARGETS[k] = g.targets[k]; });
     programFrom = "sheet";
+    applyWeekOverride();
     return true;
+  }
+
+  // ---------- Week off ----------
+  // Taking a week off moves that week and every week after it 7 days later. The new start dates are kept on the
+  // phone and sent to the Sheet's "Program · Weeks" tab (sync script v7+); once the Sheet has them, the phone copy goes.
+  var WOFF_KEY = "ptb-week-starts";
+  function applyWeekOverride() {
+    var o = recall(WOFF_KEY);
+    if (!o || o.block !== BLOCK || !o.starts) return false;
+    var same = true, changed = false;
+    WEEKS.forEach(function (w) {
+      var st = o.starts[w.n];
+      if (!st) return;
+      if (w.start !== st) { same = false; w.start = st; changed = true; }
+    });
+    if (same && o.synced) store(WOFF_KEY, null); // the Sheet caught up
+    return changed;
+  }
+  function shiftWeeks(from, days) {
+    var starts = {};
+    WEEKS.forEach(function (w) {
+      if (w.n >= from) w.start = iso(addDays(parseISO(w.start), days));
+      starts[w.n] = w.start;
+    });
+    store(WOFF_KEY, { block: BLOCK, starts: starts, synced: false });
+    if (window.WRSync) window.WRSync.mark("weeks", "starts");
+    nowPick = pickNow();
+    render();
+  }
+  function weekStartsOut() {
+    var out = []; WEEKS.forEach(function (w) { out.push({ week: w.n, start: w.start }); });
+    return { block: BLOCK, starts: out };
+  }
+  function weekOffDone() { var o = recall(WOFF_KEY); if (o) { o.synced = true; store(WOFF_KEY, o); } }
+  function weekOffBox(w) {
+    var box = el("div", "woff");
+    var end = addDays(parseISO(w.start), 6), prev = WEEKS[w.n - 2];
+    var gap = prev && Math.round((parseISO(w.start) - parseISO(prev.start)) / 86400000) >= 14;
+    var started = [1, 2, 3, 4].some(function (l) { var lg = logs[docId(w.n, l)]; return lg && (lg.done || lg.items && Object.keys(lg.items).length); });
+    if (gap && w.start > today) {
+      var ub = el("button", "linkbtn", "Undo the week off before Week " + w.n); ub.type = "button";
+      ub.addEventListener("click", function () { shiftWeeks(w.n, -7); });
+      box.appendChild(ub);
+    }
+    if (iso(end) < today || started) return box.childNodes.length ? box : null;
+    var last = WEEKS[WEEKS.length - 1];
+    var tb = el("button", "btn ghost", "Take this week off"); tb.type = "button";
+    tb.addEventListener("click", function () {
+      box.innerHTML = "";
+      var newEnd = addDays(parseISO(last.start), 13);
+      box.appendChild(el("p", null, "Week " + w.n + (w.n < last.n ? " through Week " + last.n : "") + " move a week later. Week " + w.n +
+        " starts " + longDay(addDays(parseISO(w.start), 7)) + ", and the block ends " + longDay(newEnd) + "."));
+      var row = el("div", "woffbtns");
+      var no = el("button", "btn ghost", "Cancel"); no.type = "button"; no.addEventListener("click", function () { render(); });
+      var yes = el("button", "btn", "Push it back"); yes.type = "button";
+      yes.addEventListener("click", function () { shiftWeeks(w.n, 7); weekSel = w.n; render(); });
+      row.appendChild(no); row.appendChild(yes); box.appendChild(row);
+    });
+    box.appendChild(tb);
+    return box;
   }
   // From the sync: the program as read from the Sheet. Kept on the phone so the next open starts with it.
   function receiveProgram(P) {
@@ -1385,7 +1452,10 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     for (var x = 0; x < EXTRA.length; x++) if (EXTRA[x].date === today) {
       var xc = el("span", "chip lift"); xc.appendChild(el("span", "k", "Extra")); xc.appendChild(document.createTextNode(EXTRA[x].title)); chips.appendChild(xc);
     }
-    if (!te) {
+    var nextWk = null; WEEKS.forEach(function (w) { if (!nextWk && w.start > today) nextWk = w; });
+    if (!te && nextWk && today > WEEKS[0].start) {
+      chips.appendChild(el("span", "chip", "Week off. Week " + nextWk.n + " starts " + parseISO(nextWk.start).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" })));
+    } else if (!te) {
       chips.appendChild(el("span", "chip", today < WEEKS[0].start ? "The block starts " + parseISO(WEEKS[0].start).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }) : "The block is finished. Time to build the next one."));
     } else {
       te.ents.forEach(function (e) {
@@ -2578,6 +2648,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     pad.appendChild(el("h2", null, "Week " + w.n));
     pad.appendChild(el("span", "pill" + (w.test ? " test" : ""), w.phase + " week"));
     pad.appendChild(el("p", "muted", w.intent));
+    var wob = weekOffBox(w); if (wob) pad.appendChild(wob);
     card.appendChild(pad);
     var days = el("div", "days");
     var start = parseISO(w.start);
@@ -3230,7 +3301,8 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     lg.updatedAt = up && !isNaN(up) ? up.toISOString() : new Date().toISOString();
     return lg;
   }
-  window.WR = { block: BLOCK, rows: sheetRows, bodyweightRow: bodyweightRow, fromSheet: fromSheet, program: receiveProgram, maxesOut: maxesOut, maxes: receiveMaxes };
+  window.WR = { block: BLOCK, rows: sheetRows, bodyweightRow: bodyweightRow, fromSheet: fromSheet, program: receiveProgram, maxesOut: maxesOut, maxes: receiveMaxes,
+    weekStartsOut: weekStartsOut, weekOffDone: weekOffDone };
 
   // ---------- Staying current ----------
   // When the app comes back on screen (no timers), it checks for a newer version of itself and reloads right then,
@@ -3265,6 +3337,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var saved = recall(PROG_KEY) || window.STARTER_PROGRAM;
   // The sheet's weeks can differ from the built-in ones, so pick this week again with them.
   if (saved && applyProgram(saved)) { nowPick = pickNow(); weekSel = nowPick.week || 1; if (!recall(PROG_KEY)) programFrom = "starter"; }
+  else if (applyWeekOverride()) { nowPick = pickNow(); weekSel = nowPick.week || 1; }
   var ui0 = null;
   try { ui0 = JSON.parse(sessionStorage.getItem(UIKEY) || "null"); sessionStorage.removeItem(UIKEY); } catch (e) {}
   if (ui0) {
@@ -3371,7 +3444,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   function secOf(t) { if (typeof t === "number") return t > 0 && t < 1 ? Math.round(t * 86400) : t; var p = String(t || "").split(":").map(Number); return p.reduce(function (a, b) { return a * 60 + (b || 0); }, 0); }
   function schedule(ms) { clearTimeout(timer); timer = setTimeout(flush, ms); }
   function mark(col, id) {
-    if (col !== "logs" && col !== "bodyweight" && col !== "maxes" && col !== "runs") return;
+    if (col !== "logs" && col !== "bodyweight" && col !== "maxes" && col !== "runs" && col !== "weeks") return;
     pending[col + "/" + id] = stampOf();
     put(PEND, pending);
     show();
@@ -3389,6 +3462,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       var i = k.indexOf("/"), col = k.slice(0, i), id = k.slice(i + 1), doc = (d[col] || {})[id];
       sent[k] = pending[k];
       if (col === "maxes") { try { body.maxes = window.WR.maxesOut(); } catch (e) {} return; }
+      if (col === "weeks") { try { body.weekStarts = window.WR.weekStartsOut(); } catch (e) {} return; }
       if (!doc) return;
       if (col === "runs") {
         var pace = doc.mi > 0 && doc.sec > 0 ? Math.round(doc.sec / doc.mi) : 0;
@@ -3409,7 +3483,12 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
         busy = false;
         if (res && res.ok) {
           // A sync script older than v6 ignores runs: they wait on the phone until the script is updated.
-          Object.keys(sent).forEach(function (k) { if (pending[k] === sent[k] && (k.indexOf("runs/") !== 0 || res.runs != null)) delete pending[k]; });
+          Object.keys(sent).forEach(function (k) {
+            if (pending[k] !== sent[k]) return;
+            if (k.indexOf("runs/") === 0 && res.runs == null) return;
+            if (k.indexOf("weeks/") === 0) { if (res.weekStarts == null) return; try { window.WR.weekOffDone(); } catch (e) {} }
+            delete pending[k];
+          });
           put(PEND, pending); put(LAST, new Date().toISOString());
           state = "";
         } else if (res && res.error === "passcode") {
