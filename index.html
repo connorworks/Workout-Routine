@@ -197,6 +197,8 @@ p { margin: 0; }
 .pad > .woff:first-child { margin-top: 0; }
 .woff p { margin: 0; }
 .woffbtns { display: flex; gap: 10px; }
+.pushbox { align-items: center; text-align: center; margin: 4px 0 0; }
+.pushbox .woffbtns { width: 100%; }
 .woff .btn { min-height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; padding: 0 14px; }
 .woff .btn:not(.ghost) { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .woffbtns .btn { flex: 1; }
@@ -505,6 +507,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
 .kind.off { color: var(--muted); border: 1px solid var(--line); }
 .entbtn { background: none; border: none; padding: 0; font-weight: 600; cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; min-height: 28px; }
 .bw { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 14px 16px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+.card > .bw:first-child { border-top: none; }
 
 /* Move day */
 .move { display: flex; flex-direction: column; gap: 8px; }
@@ -675,7 +678,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "46 · Nov 26";
+  var APP_VERSION = "47 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1110,31 +1113,39 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     return { block: BLOCK, starts: out };
   }
   function weekOffDone() { var o = recall(WOFF_KEY); if (o) { o.synced = true; store(WOFF_KEY, o); } }
-  function weekOffBox(w) {
-    var box = el("div", "woff");
-    var end = addDays(parseISO(w.start), 6), prev = WEEKS[w.n - 2];
-    var gap = prev && Math.round((parseISO(w.start) - parseISO(prev.start)) / 86400000) >= 14;
-    var started = [1, 2, 3, 4].some(function (l) { var lg = logs[docId(w.n, l)]; return lg && (lg.done || lg.items && Object.keys(lg.items).length); });
-    if (gap && w.start > today) {
-      var ub = el("button", "linkbtn", "Undo the week off before Week " + w.n); ub.type = "button";
-      ub.addEventListener("click", function () { shiftWeeks(w.n, -7); });
+  // Same idea as the coach app: once you've missed 2 or more lifts this week, a quiet link on Today
+  // pushes the lifts left this week (missed ones too) to next week; every later week follows a week later.
+  function weekOffCard() {
+    var box = el("div", "woff pushbox");
+    // Undo: today sits in the gap a push made (the week before was 14+ days earlier).
+    var nxt = null; WEEKS.forEach(function (w) { if (!nxt && w.start > today) nxt = w; });
+    var prv = nxt && WEEKS[nxt.n - 2], cur = null;
+    WEEKS.forEach(function (w) { if (today >= w.start && today <= iso(addDays(parseISO(w.start), 6))) cur = w; });
+    if (!cur && prv && Math.round((parseISO(nxt.start) - parseISO(prv.start)) / 86400000) >= 14 && iso(addDays(parseISO(nxt.start), -7)) <= today) {
+      var ub = el("button", "linkbtn", "Undo: put this week back"); ub.type = "button";
+      ub.addEventListener("click", function () { shiftWeeks(nxt.n, -7); weekSel = nxt.n; });
       box.appendChild(ub);
+      return box;
     }
-    if (iso(end) < today || started) return box.childNodes.length ? box : null;
-    var last = WEEKS[WEEKS.length - 1];
-    var tb = el("button", "btn ghost", "Take this week off"); tb.type = "button";
-    tb.addEventListener("click", function () {
+    if (!cur) return null;
+    var lifts = weekLifts(cur.n), start = parseISO(cur.start);
+    var open = lifts.filter(function (x) { var id = docId(x.week, x.lift); return !(logs[id] || {}).done && !liftStarted(id); });
+    var missed = open.filter(function (x) { return iso(addDays(start, x.d)) < today; });
+    if (missed.length < 2 || !open.length) return null;
+    var nextMon = addDays(start, 7), last = WEEKS[WEEKS.length - 1];
+    var b = el("button", "linkbtn", "Behind? Push " + (open.length === 1 ? "this lift" : "these " + open.length + " lifts") + " to next week"); b.type = "button";
+    b.addEventListener("click", function () {
       box.innerHTML = "";
-      var newEnd = addDays(parseISO(last.start), 13);
-      box.appendChild(el("p", null, "Week " + w.n + (w.n < last.n ? " through Week " + last.n : "") + " move a week later. Week " + w.n +
-        " starts " + longDay(addDays(parseISO(w.start), 7)) + ", and the block ends " + longDay(newEnd) + "."));
+      box.appendChild(el("p", "muted", "Your " + open.length + " remaining " + (open.length === 1 ? "lift" : "lifts") + " (" +
+        open.map(function (x) { return LIFT_META[x.lift].label; }).join(", ") + ") move to next week: Week " + cur.n + " restarts " + longDay(nextMon) +
+        ". Every later week moves back too, so the block ends " + longDay(addDays(parseISO(last.start), 13)) + "."));
       var row = el("div", "woffbtns");
       var no = el("button", "btn ghost", "Cancel"); no.type = "button"; no.addEventListener("click", function () { render(); });
-      var yes = el("button", "btn", "Push it back"); yes.type = "button";
-      yes.addEventListener("click", function () { shiftWeeks(w.n, 7); weekSel = w.n; render(); });
+      var yes = el("button", "btn", "Push to next week"); yes.type = "button";
+      yes.addEventListener("click", function () { shiftWeeks(cur.n, 7); weekSel = cur.n; });
       row.appendChild(no); row.appendChild(yes); box.appendChild(row);
     });
-    box.appendChild(tb);
+    box.appendChild(b);
     return box;
   }
   // From the sync: the program as read from the Sheet. Kept on the phone so the next open starts with it.
@@ -1479,7 +1490,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     var cur = sel || nowPick;
     document.getElementById("ctx").textContent = view === "week" ? BLOCK + " Block · Week " + weekSel + " of " + WEEKS.length : (cur.extra ? BLOCK + " Block · Extra session" : BLOCK + " Block · Week " + cur.week + " of " + WEEKS.length);
     viewEl.innerHTML = "";
-    if (view === "today") { renderToday(); viewEl.appendChild(actLink()); }
+    if (view === "today") { renderToday(); var wo = sel ? null : weekOffCard(); if (wo) viewEl.appendChild(wo); viewEl.appendChild(actLink()); }
     else if (view === "week") renderWeek();
     else if (view === "log") renderLog();
     else renderMaxes();
@@ -2736,8 +2747,6 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     viewEl.appendChild(rows);
 
     var card = el("section", "card");
-    var wob = weekOffBox(w);
-    if (wob) { var pad = el("div", "pad"); pad.appendChild(wob); card.appendChild(pad); }
     var bw = el("div", "bw");
     var lab = el("label", null, "Weigh-in"); lab.setAttribute("for", "bw-input");
     bw.appendChild(lab);
