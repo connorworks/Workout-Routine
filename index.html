@@ -653,7 +653,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "41 · Nov 26";
+  var APP_VERSION = "42 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1186,10 +1186,12 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       d[5] = [{ kind: "travel", name: "O Circuit trek" }];
       d[6] = [{ kind: "travel", name: "O Circuit trek" }];
     }
+    // Each lift sits on exactly one day: where it was moved (or done), else its planned day.
     for (var l = 1; l <= 4; l++) {
-      var def = LIFT_META[l].day, now = liftDayIdx(w, l);
-      if (def === now) continue;
-      for (var j = 0; j < d[def].length; j++) if (d[def][j].kind === "lift" && d[def][j].lift === l) { d[def].splice(j, 1); break; }
+      var now = liftDayIdx(w, l), at = [];
+      d.forEach(function (ents, di) { ents.forEach(function (e) { if (e.kind === "lift" && e.lift === l) at.push(di); }); });
+      if (at.length === 1 && at[0] === now) continue;
+      d.forEach(function (ents, di) { d[di] = ents.filter(function (e) { return !(e.kind === "lift" && e.lift === l); }); });
       d[now].push({ kind: "lift", lift: l });
     }
     return d;
@@ -2689,8 +2691,12 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     card.appendChild(pad);
     var days = el("div", "days");
     var start = parseISO(w.start);
+    // Days a lift was moved off: hidden once nothing else (a lift or class) is left on them.
+    var movedOff = {};
+    for (var ml = 1; ml <= 4; ml++) { var ms = SESS[ml][w.n - 1], pd = planDay(w.n, ml); if (ms && !ms.off && liftDayIdx(w.n, ml) !== pd) movedOff[pd] = true; }
     dayEntries(w.n).forEach(function (ents, i) {
       var dt = addDays(start, i);
+      if (movedOff[i] && !ents.some(function (e) { var s0 = e.kind === "lift" && SESS[e.lift][w.n - 1]; return (s0 && !s0.off) || e.kind === "class"; })) return;
       // A day is finished once its date has passed, or once every lift on it is done.
       var past = iso(dt) < today;
       var lifts = ents.filter(function (e) { var s = e.kind === "lift" && SESS[e.lift][w.n - 1]; return s && !s.off; });
