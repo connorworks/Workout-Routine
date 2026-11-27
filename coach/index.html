@@ -316,6 +316,7 @@ a.wlrow { text-decoration: none; }
 .actErr { color: #C62828; margin: 0; }
 .actf input::placeholder { color: var(--muted); opacity: .55; font-weight: 400; }
 .linkbtn.danger { color: #C62828; align-self: center; }
+.addactlink { display: block; margin: 4px auto 16px; font-size: 14px; font-weight: 500; color: var(--muted); text-align: center; }
 </style>
 </head>
 <body>
@@ -348,7 +349,7 @@ a.wlrow { text-decoration: none; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "38";
+  var VERSION = "39";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1219,6 +1220,7 @@ a.wlrow { text-decoration: none; }
     return box;
   }
   function renderToday() {
+    if (actForm) { viewEl.appendChild(activityForm()); return; }
     if (DEMO) viewEl.appendChild(el("div", "banner", "Demo program. Nothing you log here goes to a coach."));
     var tip = homeTip(); if (tip) viewEl.appendChild(tip);
     var m = model(), ts = m.sessions.length ? todaySession() : null;
@@ -1231,6 +1233,7 @@ a.wlrow { text-decoration: none; }
       renderSession(ts, true);
       if (!isDone(ts.id) && bonus.length) viewEl.appendChild(bonusCard(bonus));
       var wo1 = weekOffCard(); if (wo1) viewEl.appendChild(wo1);
+      viewEl.appendChild(addActLink());
       return;
     }
     if (plan().on && m.sessions.some(function (x) { return !isDone(x.id); })) {
@@ -1252,6 +1255,7 @@ a.wlrow { text-decoration: none; }
       viewEl.appendChild(rc);
       if (bonus.length) viewEl.appendChild(bonusCard(bonus));
       var wo2 = weekOffCard(); if (wo2) viewEl.appendChild(wo2);
+      viewEl.appendChild(addActLink());
       return;
     }
     var nx = nextSession();
@@ -1288,6 +1292,7 @@ a.wlrow { text-decoration: none; }
     var wk = nx ? nx.week : m.weeks[m.weeks.length - 1];
     viewEl.appendChild(el("div", "eyebrow", "Week " + wk));
     viewEl.appendChild(sessionRows(m.sessions.filter(function (s) { return s.week === wk; }), nx));
+    viewEl.appendChild(addActLink());
   }
 
   function sessionRows(list, nx) {
@@ -1990,6 +1995,11 @@ a.wlrow { text-decoration: none; }
     setTimeout(function () { if (!f.id) try { name.focus(); } catch (e) {} }, 50);
     return c;
   }
+  function addActLink() {
+    var b = el("button", "linkbtn addactlink", "+ Did a class or run? Add it"); b.type = "button";
+    b.addEventListener("click", function () { actForm = { kind: "Class", date: isoDay() }; render(); window.scrollTo(0, 0); });
+    return b;
+  }
   function editActivity(a) {
     var parts = String(a.notes || "").split(" · "), kind = /^(Class|Run|Other)$/.test(parts[0]) ? parts[0] : "Other";
     var mi = parts.filter(function (x) { return / mi$/.test(x); })[0];
@@ -2086,11 +2096,8 @@ a.wlrow { text-decoration: none; }
         var c5 = el("section", "card wlog");
         var lh = el("div", "wlhead");
         lh.appendChild(el("h3", null, "Workout log"));
-        var ab = el("button", "addact", "+ Add activity"); ab.type = "button";
-        ab.addEventListener("click", function () { actForm = { kind: "Class", date: isoDay() }; render(); window.scrollTo(0, 0); });
-        lh.appendChild(ab);
         c5.appendChild(lh);
-        if (!done.length) c5.appendChild(el("p", "hsub", "Your workouts show up here. Did a class or a run? Add it so it sits next to them."));
+        if (!done.length) c5.appendChild(el("p", "hsub", "Your workouts show up here."));
         done.forEach(function (x) {
           if (x.strava) { c5.appendChild(stravaRow(x.strava)); return; }
           if (x.act) { c5.appendChild(activityRow(x.act)); return; }
