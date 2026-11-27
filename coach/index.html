@@ -329,7 +329,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "35";
+  var VERSION = "36";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -983,7 +983,9 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       var d = dateOf(x.id); return d && (d <= end);
     });
     var mon = null, lab = "";
-    if (!off[thisMon] && left.length) { mon = thisMon; lab = "this week"; }
+    // Only offered once they've missed 2 or more workouts.
+    var missedN = model().sessions.filter(function (x) { return isMissed(x.id); }).length;
+    if (!off[thisMon] && left.length && missedN >= 2) { mon = thisMon; lab = "this week"; }
     if (mon) {
       var ask = mon === thisMon ? "Behind? Push " + (left.length === 1 ? "this workout" : "these " + left.length + " workouts") + " to next week" : "Need a break? Skip next week";
       var b = el("button", "linkbtn", ask); b.type = "button";
