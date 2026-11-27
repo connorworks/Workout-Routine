@@ -444,6 +444,26 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
 .empty { padding: 20px 16px; color: var(--muted); }
 
 /* Week */
+.wbar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.wbar::-webkit-scrollbar { display: none; }
+.wbtn { flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 12px; padding: 8px 14px; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
+.wbtn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.wbtn .d { font-size: 11px; font-weight: 600; margin-left: 6px; color: var(--ok); }
+.wbtn[aria-pressed="true"] .d { color: var(--bg); }
+.lrows { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.lrow { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; text-align: left; background: none; border: none; border-top: 1px solid var(--line); padding: 14px 16px; font: inherit; color: var(--ink); cursor: pointer; }
+.lrow:first-child { border-top: none; }
+.lrow .k { font-size: 12px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+.lrow .n { font-weight: 700; font-size: 17px; }
+.lrow .st { grid-row: 1 / span 2; grid-column: 2; }
+.lrow.next { background: var(--accent-soft); }
+.lnone { padding: 16px; margin: 0; }
+.tag { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 4px 9px; border-radius: 99px; background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.tag.done { background: var(--ok-soft); color: var(--ok); }
+.tag.prog { background: var(--accent-soft); color: var(--accent); }
+.tag.miss { background: var(--test-soft); color: var(--test); }
+.whd { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.whd .muted { font-size: 14px; }
 .rail { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
 .wk { flex: 0 0 auto; min-width: 96px; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; text-align: left; }
 .wk .n { font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1; }
@@ -653,7 +673,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "43 · Nov 26";
+  var APP_VERSION = "44 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -2670,84 +2690,57 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   $("wod-minus").addEventListener("click", function () { W.tally = Math.max(0, W.tally - 1); $("wod-rounds").textContent = String(W.tally); });
 
   // ---------- Week ----------
+  // A lift is started once its clock is running or any set is checked.
+  function liftStarted(id) {
+    if (running && running.id === id) return true;
+    var ck = currentLog(id).checks || {};
+    return Object.keys(ck).some(function (k) { return (ck[k] || []).some(Boolean); });
+  }
+  // The week's lifts, in day order (each lift sits on the day it was moved to or done).
+  function weekLifts(n) {
+    var out = [];
+    for (var l = 1; l <= 4; l++) { var s0 = SESS[l][n - 1]; if (s0 && !s0.off) out.push({ week: n, lift: l, d: liftDayIdx(n, l), s: s0 }); }
+    return out.sort(function (x, y) { return x.d - y.d || x.lift - y.lift; });
+  }
+  // Same layout as the coach app's Program tab: Week pills, then one row per lift with its status.
   function renderWeek() {
-    var rail = el("nav", "rail"); rail.setAttribute("aria-label", "Weeks");
+    var bar = el("nav", "wbar"); bar.setAttribute("aria-label", "Weeks");
     WEEKS.forEach(function (w) {
-      var b = el("button", "wk"); b.type = "button";
+      var b = el("button", "wbtn", "Week " + w.n); b.type = "button";
       b.setAttribute("aria-pressed", String(w.n === weekSel));
-      var end = addDays(parseISO(w.start), 6);
-      b.appendChild(el("span", "n", "W" + w.n));
-      b.appendChild(el("span", "d", short(parseISO(w.start)) + " – " + short(end)));
-      b.appendChild(el("span", "ph" + (w.test ? " test" : ""), w.phase));
-      if (today >= w.start && today <= iso(end)) b.appendChild(el("span", "now", "This week"));
+      var ls = weekLifts(w.n);
+      if (ls.length && ls.every(function (x) { return (logs[docId(x.week, x.lift)] || {}).done; })) b.appendChild(el("span", "d", "✓"));
       b.addEventListener("click", function () { weekSel = w.n; render(); });
-      rail.appendChild(b);
+      bar.appendChild(b);
     });
-    viewEl.appendChild(rail);
+    viewEl.appendChild(bar);
+    setTimeout(function () { var on = bar.querySelector('[aria-pressed="true"]'); if (on && on.scrollIntoView) try { on.scrollIntoView({ block: "nearest", inline: "nearest" }); } catch (e) {} }, 0);
 
-    var w = WEEKS[weekSel - 1];
+    var w = WEEKS[weekSel - 1], start = parseISO(w.start);
+    var nxId = nowPick && !nowPick.extra ? docId(nowPick.week, nowPick.lift) : null;
+    var rows = el("div", "lrows");
+    weekLifts(w.n).forEach(function (x) {
+      var id = docId(x.week, x.lift), dt = addDays(start, x.d), di = iso(dt), lg = logs[id] || {};
+      var b = el("button", "lrow" + (id === nxId && !lg.done ? " next" : "")); b.type = "button";
+      b.appendChild(el("span", "k", dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }) + " · " + LIFT_META[x.lift].label));
+      var st = lg.done ? el("span", "tag done", "Done") : liftStarted(id) ? el("span", "tag prog", "Started")
+        : di < today ? el("span", "tag miss", "Missed") : di === today ? el("span", "tag prog", "Today") : el("span", "tag", "To do");
+      st.classList.add("st"); b.appendChild(st);
+      b.appendChild(el("span", "n", x.s.travel ? "Travel session" : LIFT_META[x.lift].title));
+      b.addEventListener("click", function () { sel = { week: x.week, lift: x.lift }; go("today", true); });
+      rows.appendChild(b);
+    });
+    if (!rows.childNodes.length) rows.appendChild(el("p", "muted lnone", "No lifts this week."));
+    viewEl.appendChild(rows);
+
     var card = el("section", "card");
     var pad = el("div", "pad");
-    pad.appendChild(el("h2", null, "Week " + w.n));
-    pad.appendChild(el("span", "pill" + (w.test ? " test" : ""), w.phase + " week"));
-    pad.appendChild(el("p", "muted", w.intent));
+    var hd = el("div", "whd"); hd.appendChild(el("span", "pill" + (w.test ? " test" : ""), w.phase + " week"));
+    hd.appendChild(el("span", "muted", short(start) + " – " + short(addDays(start, 6))));
+    pad.appendChild(hd);
+    if (w.intent) pad.appendChild(el("p", "muted", w.intent));
     var wob = weekOffBox(w); if (wob) pad.appendChild(wob);
     card.appendChild(pad);
-    var days = el("div", "days");
-    var start = parseISO(w.start);
-    // Days a lift moved off (by you or by the plan) are hidden once no lift or class is left on them,
-    // and so are past days with nothing on them. Today always shows; so do planned rest days.
-    var de = dayEntries(w.n), movedOff = {};
-    for (var ml = 1; ml <= 4; ml++) { var ms = SESS[ml][w.n - 1], pd = planDay(w.n, ml); if (ms && !ms.off && liftDayIdx(w.n, ml) !== pd) movedOff[pd] = true; }
-    de.forEach(function (ents, i) {
-      var dt = addDays(start, i);
-      var busy = ents.some(function (e) { var s0 = e.kind === "lift" && SESS[e.lift][w.n - 1]; return (s0 && !s0.off) || e.kind === "class"; });
-      if (iso(dt) !== today && !busy && ((movedOff[i] || de.lost[i]) || (iso(dt) < today && !ents.length))) return;
-      // A day is finished once its date has passed, or once every lift on it is done.
-      var past = iso(dt) < today;
-      var lifts = ents.filter(function (e) { var s = e.kind === "lift" && SESS[e.lift][w.n - 1]; return s && !s.off; });
-      var liftsDone = lifts.length && lifts.every(function (e) { var lg = logs[docId(w.n, e.lift)]; return lg && lg.done; });
-      var finished = lifts.length ? !!liftsDone : past;
-      var row = el("div", "day" + (iso(dt) === today ? " today" : "") + (finished ? " done" : "") + (past ? " past" : ""));
-      var dl = el("div", "dl", DOW[i]); dl.appendChild(el("span", null, short(dt)));
-      if (finished) { var dk = el("span", "dck", "✓"); dk.setAttribute("aria-label", "Done"); dl.appendChild(dk); }
-      row.appendChild(dl);
-      var box = el("div", "ents");
-      ents.forEach(function (e) {
-        var line = el("div", "ent");
-        if (e.kind === "lift") {
-          var meta = LIFT_META[e.lift], s = SESS[e.lift][w.n - 1];
-          if (s && s.off) return;
-          var isTravel = s && s.travel;
-          line.appendChild(el("span", "kind lift", meta.label));
-          var b = el("button", "entbtn", isTravel ? "Travel session" : meta.title); b.type = "button";
-          b.addEventListener("click", function () { sel = { week: w.n, lift: e.lift }; go("today", true); });
-          line.appendChild(b);
-          var lg = logs[docId(w.n, e.lift)];
-          if (lg && lg.done) line.appendChild(el("span", "chip-done", "Done"));
-          else if (past) line.appendChild(el("span", "chip-miss", "Not logged"));
-        } else if (e.kind === "class") {
-          line.appendChild(el("span", "kind class", "Class"));
-          line.appendChild(el("span", null, e.name));
-          line.appendChild(el("span", "tm", e.tm));
-          if (e.note) line.appendChild(el("span", "note", e.note));
-        } else if (e.kind === "travel") {
-          var loc = el("span", "loc"); loc.appendChild(pinIcon()); loc.appendChild(document.createTextNode(e.name));
-          line.appendChild(loc);
-          if (e.note) line.appendChild(el("span", "note", e.note));
-        } else if (e.kind === "note") {
-          line.appendChild(el("span", "kind off", "Note"));
-          line.appendChild(el("span", null, e.name));
-        } else {
-          line.appendChild(el("span", "kind off", "Rest"));
-          line.appendChild(el("span", null, "Off"));
-        }
-        box.appendChild(line);
-      });
-      row.appendChild(box);
-      days.appendChild(row);
-    });
-    card.appendChild(days);
     var bw = el("div", "bw");
     var lab = el("label", null, "Weigh-in"); lab.setAttribute("for", "bw-input");
     bw.appendChild(lab);
