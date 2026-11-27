@@ -287,6 +287,8 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 .trow .rg { display: flex; }
 .welcome .steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; }
 .welcome .steps .ico { vertical-align: -3px; color: var(--accent); }
+.weekoff { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 4px 12px; text-align: center; }
+.weekoff .btnrow { width: 100%; }
 </style>
 </head>
 <body>
@@ -319,7 +321,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "31";
+  var VERSION = "32";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -585,6 +587,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 
   // ---------- Sync with the coach's sheet ----------
   function rowsFor(id) {
+    if (/^off-/.test(id)) { var o = logs[id]; return o ? [[id, id.slice(4), "", "", "Week off", o.status, "", "", "", "", "", false, "", "", ""]] : []; }
     var s = model().byId[id], lg = logs[id];
     if (!s || !lg) return [];
     if (!localStarted(lg)) return lg.moved ? [[id, lg.moved, s.week, s.day, s.title, "Moved", "", "", "", "", "", false, "", "", ""]] : [];
@@ -937,6 +940,53 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     var list = Object.keys(days).map(Number);
     return list.length ? { days: list } : null;
   }
+  // ---------- Week off ----------
+  // A skipped week (Mon to Sun) gets no workouts; everything after it moves a week later. It's saved as a log entry
+  // "off-<Monday>" with status "Skipped" (or "Undone"), so it syncs to the client's Log tab and comes back on any phone.
+  function mondayOf(d) { return addDays(d, -((d.getDay() + 6) % 7)); }
+  function offWeeks() {
+    var out = {};
+    Object.keys(remote()).forEach(function (id) { if (/^off-/.test(id) && remote()[id].status === "Skipped") out[id.slice(4)] = 1; });
+    Object.keys(logs).forEach(function (id) { if (!/^off-/.test(id)) return; if (logs[id].status === "Skipped") out[id.slice(4)] = 1; else delete out[id.slice(4)]; });
+    return out;
+  }
+  function setWeekOff(mon, on) {
+    var id = "off-" + mon;
+    logs[id] = { items: {}, notes: "", status: on ? "Skipped" : "Undone", date: mon };
+    save(LKEY, logs); PL = null; queueSync(id, true); render(); window.scrollTo(0, 0);
+  }
+  function weekBusy(mon) {
+    var end = isoDay(addDays(parseISO(mon), 6));
+    return model().sessions.some(function (x) { var d = (isStarted(x.id) || isDone(x.id)) && dateOf(x.id); return d && d >= mon && d <= end; });
+  }
+  function weekOffCard() {
+    if (!plan().on || !model().sessions.some(function (x) { return !x.opt && !isDone(x.id); })) return null;
+    var off = offWeeks(), thisMon = isoDay(mondayOf(parseISO(isoDay()))), nextMon = isoDay(addDays(parseISO(thisMon), 7));
+    var box = el("div", "weekoff");
+    var undo = function (mon, label) {
+      var b = el("button", "linkbtn", "Undo the week off " + label); b.type = "button";
+      b.addEventListener("click", function () { setWeekOff(mon, false); });
+      box.appendChild(b);
+    };
+    if (off[thisMon]) undo(thisMon, "this week");
+    if (off[nextMon]) undo(nextMon, "next week");
+    var mon = !off[thisMon] && !weekBusy(thisMon) ? thisMon : !off[nextMon] && !off[thisMon] ? nextMon : null;
+    if (mon) {
+      var lab = mon === thisMon ? "this week" : "next week";
+      var b = el("button", "linkbtn", "Need a break? Skip " + lab); b.type = "button";
+      b.addEventListener("click", function () {
+        box.innerHTML = "";
+        box.appendChild(el("p", "muted", "No workouts " + lab + " (" + fmtDay(mon) + " to " + fmtDay(isoDay(addDays(parseISO(mon), 6))) + "). Everything after moves a week later."));
+        var row = el("div", "btnrow");
+        var no = el("button", "btn ghost", "Cancel"); no.type = "button"; no.addEventListener("click", function () { render(); });
+        var yes = el("button", "btn", "Skip " + lab); yes.type = "button"; yes.addEventListener("click", function () { setWeekOff(mon, true); });
+        row.appendChild(no); row.appendChild(yes); box.appendChild(row);
+      });
+      box.appendChild(b);
+    }
+    return box.childNodes.length ? box : null;
+  }
+
   function plan() {
     if (PL) return PL;
     PL = { on: false, at: {} };
@@ -944,8 +994,10 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     if (!st || !rule) return PL;
     PL.on = true; PL.start = isoDay(st);
     var ss = model().sessions.filter(function (x) { return !x.opt; }), d = st, k = 0;
+    var off = offWeeks();
     for (var n = 0; k < ss.length && n < 3650; n++, d = addDays(d, 1)) {
       var train = rule.days ? rule.days.indexOf(d.getDay()) >= 0 : (n % (rule.on + rule.off)) < rule.on;
+      if (off[isoDay(mondayOf(d))]) train = false;
       if (train) PL.at[ss[k++].id] = isoDay(d);
     }
     return PL;
@@ -1075,6 +1127,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       if (isDone(ts.id) && bonus.length) viewEl.appendChild(bonusCard(bonus));
       renderSession(ts, true);
       if (!isDone(ts.id) && bonus.length) viewEl.appendChild(bonusCard(bonus));
+      var wo1 = weekOffCard(); if (wo1) viewEl.appendChild(wo1);
       return;
     }
     if (plan().on && m.sessions.some(function (x) { return !isDone(x.id); })) {
@@ -1083,7 +1136,8 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       if (missed.length) viewEl.appendChild(missedCard(missed));
       var up = upcoming(), rc = el("section", "card");
       var first = up && up.id === m.sessions[0].id && !m.sessions.some(function (x) { return isStarted(x.id) || isDone(x.id); });
-      rc.appendChild(el("div", "eyebrow", first ? "Your program starts " + fmtDay(dateOf(up.id)) : "Rest day"));
+      var offNow = offWeeks()[isoDay(mondayOf(parseISO(isoDay())))];
+      rc.appendChild(el("div", "eyebrow", offNow ? "Week off · back " + fmtDay(dateOf(up ? up.id : "")) : first ? "Your program starts " + fmtDay(dateOf(up.id)) : "Rest day"));
       if (up) {
         rc.appendChild(el("h2", null, up.title));
         rc.appendChild(el("p", "muted", "Next up " + fmtDay(dateOf(up.id)) + " · " + sessLabel(up)));
@@ -1094,6 +1148,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       } else rc.appendChild(el("p", "muted", "Nothing else on the schedule. Move a missed workout to today to catch up."));
       viewEl.appendChild(rc);
       if (bonus.length) viewEl.appendChild(bonusCard(bonus));
+      var wo2 = weekOffCard(); if (wo2) viewEl.appendChild(wo2);
       return;
     }
     var nx = nextSession();
