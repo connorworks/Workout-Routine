@@ -289,6 +289,14 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 .welcome .steps .ico { vertical-align: -3px; color: var(--accent); }
 .weekoff { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 4px 12px; text-align: center; }
 .weekoff .btnrow { width: 100%; }
+.wlog { gap: 0; }
+.wlog h3 { margin-bottom: 6px; }
+.wlrow { display: grid; grid-template-columns: 72px 1fr; align-items: baseline; gap: 14px; width: 100%; background: none; border: none; border-top: 1px solid var(--line); padding: 16px 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.wlrow:first-of-type { border-top: none; }
+.wld { display: flex; flex-direction: column; gap: 4px; }
+.wld .md { font-weight: 700; }
+.wld .dw { color: var(--muted); font-size: 14px; }
+.wlrow .wlt { font-size: 18px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -321,7 +329,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "32";
+  var VERSION = "33";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -1837,39 +1845,6 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       c1.appendChild(g1);
       viewEl.appendChild(c1);
 
-      var ts = todaySession() || (plan().on ? upcoming() : null), cw = ts ? ts.week : m.weeks[m.weeks.length - 1], tw = wk[cw] || { vol: 0, reps: 0, n: 0, min: 0 };
-      var planned = m.sessions.filter(function (x) { return x.week === cw && !x.opt; }).length;
-      var c2 = el("section", "card");
-      c2.appendChild(el("h3", null, "This week"));
-      c2.appendChild(el("p", "hsub", "Week " + cw + " · " + tw.n + " of " + planned + " workouts done"));
-      var g2 = el("div", "stats");
-      g2.appendChild(statTile("Volume (lb)", bigNum(tw.vol))); g2.appendChild(statTile("Reps", tw.reps.toLocaleString("en-US"))); g2.appendChild(statTile("Hours", String(Math.round(tw.min / 6) / 10)));
-      c2.appendChild(g2);
-      viewEl.appendChild(c2);
-
-      var c3 = el("section", "card");
-      c3.appendChild(el("h3", null, "Weekly volume"));
-      c3.appendChild(el("p", "hsub", "Pounds moved each week of the program. Tap a bar."));
-      var max = 1; m.weeks.forEach(function (w) { if (wk[w] && wk[w].vol > max) max = wk[w].vol; });
-      var bars = el("div", "bars"), bx = el("div", "barx"), ro = el("div", "readout");
-      bars.style.gridTemplateColumns = bx.style.gridTemplateColumns = "repeat(" + m.weeks.length + ", 1fr)";
-      bars.setAttribute("role", "img");
-      bars.setAttribute("aria-label", "Weekly volume: " + m.weeks.map(function (w) { return "week " + w + " " + Math.round((wk[w] || {}).vol || 0) + " lb"; }).join(", "));
-      function readout(w) { var v = wk[w] || { vol: 0, reps: 0, n: 0 }; ro.textContent = "Week " + w + ": " + Math.round(v.vol).toLocaleString("en-US") + " lb · " + v.reps + " reps · " + v.n + (v.n === 1 ? " workout" : " workouts"); }
-      if (barSel == null || m.weeks.indexOf(barSel) < 0) barSel = cw;
-      m.weeks.forEach(function (w, j) {
-        var v = (wk[w] || {}).vol || 0;
-        var b = el("button", "barc"); b.type = "button";
-        b.setAttribute("aria-pressed", String(w === barSel)); b.setAttribute("aria-label", "Week " + w + ", " + Math.round(v) + " pounds");
-        var f = el("div", "bf"); f.style.height = (v ? Math.max(3, 100 * v / max) : 0) + "%"; b.appendChild(f);
-        b.addEventListener("click", function () { barSel = w; Array.prototype.forEach.call(bars.children, function (x, k) { x.setAttribute("aria-pressed", String(k === j)); }); readout(w); });
-        bars.appendChild(b);
-        bx.appendChild(el("span", w === cw ? "now" : null, "W" + w));
-      });
-      readout(barSel);
-      c3.appendChild(bars); c3.appendChild(bx); c3.appendChild(ro);
-      viewEl.appendChild(c3);
-
       // Estimated 1-rep max (Epley) for the four main lifts, from the best set of each.
       var best = {};
       L.forEach(function (x) { x.sets.forEach(function (t) {
@@ -1892,6 +1867,25 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
         });
         c4.appendChild(ml);
         viewEl.appendChild(c4);
+      }
+
+      // Workout log: newest first, the day and the workout's name.
+      var done = L.filter(function (x) { return x.done; }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+      if (done.length) {
+        var c5 = el("section", "card wlog");
+        c5.appendChild(el("h3", null, "Workout log"));
+        done.forEach(function (x) {
+          var s0 = m.byId[x.id], r = el("button", "wlrow"); r.type = "button";
+          var d = parseISO(x.date);
+          var dc = el("span", "wld");
+          dc.appendChild(el("span", "md", d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""));
+          dc.appendChild(el("span", "dw", d ? d.toLocaleDateString("en-US", { weekday: "short" }) : ""));
+          r.appendChild(dc);
+          r.appendChild(el("span", "wlt", s0 ? (s0.opt ? optTitle(s0) : s0.title) : x.id));
+          r.addEventListener("click", function () { open(x.id); });
+          c5.appendChild(r);
+        });
+        viewEl.appendChild(c5);
       }
     }
     if (!L.length) {
