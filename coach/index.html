@@ -303,6 +303,19 @@ a.wlrow { text-decoration: none; }
 .pwst { font-size: 12px; color: var(--muted); padding-top: 10px; border-top: 1px solid var(--line); }
 .stbtn { min-height: 48px; border-radius: 12px; border: none; background: #FC5200; color: #fff; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; }
 .strow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.wlhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+.wlhead h3 { margin: 0; }
+.wlog .wlhead + .wlrow { border-top: none; }
+.addact { border: 1px solid var(--line); background: var(--sunk); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }
+.wlrow .actv { color: var(--accent); font-weight: 800; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.actkinds { display: flex; gap: 8px; }
+.chipbtn { flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.chipbtn[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: transparent; }
+.actf { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 14px; }
+.actf input { height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-size: 17px; padding: 0 12px; }
+.actErr { color: #C62828; margin: 0; }
+.actf input::placeholder { color: var(--muted); opacity: .55; font-weight: 400; }
+.linkbtn.danger { color: #C62828; align-self: center; }
 </style>
 </head>
 <body>
@@ -335,7 +348,7 @@ a.wlrow { text-decoration: none; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "37";
+  var VERSION = "38";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -653,6 +666,7 @@ a.wlrow { text-decoration: none; }
 
   // ---------- Sync with the coach's sheet ----------
   function rowsFor(id) {
+    if (/^act-/.test(id)) { var ac = logs[id]; return ac ? [[id, ac.date, "", "", ac.title, ac.status, "", "", "", "", "", false, ac.notes || "", "", ac.minutes != null ? ac.minutes : ""]] : []; }
     if (/^off-/.test(id)) { var o = logs[id]; return o ? [[id, id.slice(4), "", "", "Week off", o.status, "", "", "", "", "", false, "", "", ""]] : []; }
     var s = model().byId[id], lg = logs[id];
     if (!s || !lg) return [];
@@ -1906,6 +1920,101 @@ a.wlrow { text-decoration: none; }
     viewEl.appendChild(c);
   }
 
+  // ---------- Activities ----------
+  // A class, run or anything else done outside the program. Saved as a log entry "act-<time>" with status "Activity"
+  // (or "Deleted"), so it syncs to the client's Log tab and shows in their workout log. It doesn't count toward the streak.
+  var actForm = null;
+  function activities() {
+    var out = {};
+    Object.keys(remote()).forEach(function (id) {
+      if (!/^act-/.test(id)) return;
+      var r = remote()[id]; if (r.status !== "Activity") return;
+      out[id] = { id: id, date: r.date, title: (data.history || []).filter(function (h) { return h[0] === id; }).map(function (h) { return h[4]; })[0] || "Activity", notes: r.notes, minutes: r.minutes };
+    });
+    Object.keys(logs).forEach(function (id) {
+      if (!/^act-/.test(id)) return;
+      if (logs[id].status === "Activity") out[id] = Object.assign({ id: id }, logs[id]); else delete out[id];
+    });
+    return Object.keys(out).map(function (k) { return out[k]; });
+  }
+  function saveActivity(a) {
+    var id = a.id || "act-" + Date.now();
+    logs[id] = { items: {}, status: a.deleted ? "Deleted" : "Activity", date: a.date, title: a.title, notes: a.notes || "", minutes: a.minutes };
+    save(LKEY, logs); queueSync(id, true);
+  }
+  function activityForm() {
+    var f = actForm, c = el("section", "card actform");
+    c.appendChild(el("h3", null, f.id ? "Edit activity" : "Add an activity"));
+    var kinds = el("div", "actkinds");
+    ["Class", "Run", "Other"].forEach(function (k) {
+      var b = el("button", "chipbtn", k); b.type = "button"; b.setAttribute("aria-pressed", String(f.kind === k));
+      b.addEventListener("click", function () { f.kind = k; render(); });
+      kinds.appendChild(b);
+    });
+    c.appendChild(kinds);
+    var field = function (label, input) { var l = el("label", "actf"); l.appendChild(el("span", null, label)); l.appendChild(input); c.appendChild(l); return input; };
+    var inp = function (type, val, ph, mode) { var i = document.createElement("input"); i.type = type; i.value = val == null ? "" : val; if (ph) i.placeholder = ph; if (mode) i.inputMode = mode; return i; };
+    var name = field(f.kind === "Class" ? "Class name" : "Name", inp("text", f.name, f.kind === "Class" ? "Reformer Tempo" : f.kind === "Run" ? "Morning run" : "Tennis"));
+    var where = f.kind === "Class" ? field("Studio (optional)", inp("text", f.where, "Jungle Studio Fitness")) : null;
+    var dist = f.kind === "Run" ? field("Distance (mi)", inp("text", f.mi, "3.1", "decimal")) : null;
+    var mins = field(f.kind === "Run" ? "Time (min)" : "Minutes (optional)", inp("text", f.minutes, f.kind === "Run" ? "28" : "45", "numeric"));
+    var date = field("Date", inp("date", f.date || isoDay()));
+    // Keep what's typed when switching between Class, Run and Other.
+    name.addEventListener("input", function () { f.name = name.value; });
+    if (where) where.addEventListener("input", function () { f.where = where.value; });
+    if (dist) dist.addEventListener("input", function () { f.mi = dist.value; });
+    mins.addEventListener("input", function () { f.minutes = mins.value; });
+    date.addEventListener("input", function () { f.date = date.value; });
+    date.max = isoDay();
+    var err = el("p", "actErr"); err.hidden = true; c.appendChild(err);
+    var row = el("div", "btnrow");
+    var no = el("button", "btn ghost", "Cancel"); no.type = "button"; no.addEventListener("click", function () { actForm = null; render(); });
+    var yes = el("button", "btn", "Save"); yes.type = "button";
+    yes.addEventListener("click", function () {
+      var nm = name.value.trim() || (f.kind === "Run" ? "Run" : ""), mi = dist ? parseFloat(dist.value) : NaN, mn = parseFloat(mins.value);
+      if (!nm) { err.textContent = "Add a name."; err.hidden = false; return; }
+      if (f.kind === "Run" && !(mi > 0)) { err.textContent = "Add the distance."; err.hidden = false; return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date.value)) { err.textContent = "Pick a date."; err.hidden = false; return; }
+      var notes = [f.kind];
+      if (where && where.value.trim()) notes.push(where.value.trim());
+      if (mi > 0) notes.push(Math.round(mi * 100) / 100 + " mi");
+      saveActivity({ id: f.id, date: date.value, title: nm, notes: notes.join(" · "), minutes: mn > 0 ? Math.round(mn) : null });
+      actForm = null; render();
+    });
+    row.appendChild(no); row.appendChild(yes); c.appendChild(row);
+    if (f.id) {
+      var del = el("button", "linkbtn danger", "Delete this activity"); del.type = "button";
+      del.addEventListener("click", function () { saveActivity({ id: f.id, date: f.date, title: f.name, deleted: true }); actForm = null; render(); });
+      c.appendChild(del);
+    }
+    setTimeout(function () { if (!f.id) try { name.focus(); } catch (e) {} }, 50);
+    return c;
+  }
+  function editActivity(a) {
+    var parts = String(a.notes || "").split(" · "), kind = /^(Class|Run|Other)$/.test(parts[0]) ? parts[0] : "Other";
+    var mi = parts.filter(function (x) { return / mi$/.test(x); })[0];
+    var where = kind === "Class" ? parts.filter(function (x, i) { return i > 0 && !/ mi$/.test(x); })[0] : "";
+    actForm = { id: a.id, kind: kind, name: a.title, where: where || "", mi: mi ? parseFloat(mi) : "", minutes: a.minutes, date: a.date };
+    render(); window.scrollTo(0, 0);
+  }
+  function activityRow(a) {
+    var r = el("button", "wlrow"); r.type = "button";
+    var d = parseISO(a.date), dc = el("span", "wld");
+    dc.appendChild(el("span", "md", d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""));
+    dc.appendChild(el("span", "dw", d ? d.toLocaleDateString("en-US", { weekday: "short" }) : ""));
+    r.appendChild(dc);
+    var t = el("span", "wlt"); t.appendChild(document.createTextNode(a.title));
+    var parts = String(a.notes || "").split(" · "), kind = parts.shift() || "Activity";
+    var mi = parts.filter(function (x) { return / mi$/.test(x); })[0];
+    var bits = parts.slice();
+    if (a.minutes) bits.push(a.minutes + " min");
+    if (kind === "Run" && mi && a.minutes) { var p = Math.round(a.minutes * 60 / parseFloat(mi)); bits.push(Math.floor(p / 60) + ":" + (p % 60 < 10 ? "0" : "") + p % 60 + "/mi"); }
+    var sub = el("span", "wls"); sub.appendChild(el("span", "actv", kind)); if (bits.length) sub.appendChild(document.createTextNode(" " + bits.join(" · ")));
+    t.appendChild(sub); r.appendChild(t);
+    r.addEventListener("click", function () { editActivity(a); });
+    return r;
+  }
+
   function stravaRow(a) {
     var r = el("a", "wlrow"); r.href = "https://www.strava.com/activities/" + a.id; r.target = "_blank"; r.rel = "noopener";
     var d = parseISO(a.date), dc = el("span", "wld");
@@ -1947,6 +2056,7 @@ a.wlrow { text-decoration: none; }
 
   function renderHistory() {
     var L = loggedSessions(), m = model();
+    if (actForm) { viewEl.appendChild(activityForm()); return; }
     trackCards();
     if (L.length) {
       var all = { vol: 0, reps: 0, n: 0, min: 0 }, wk = {};
@@ -1964,17 +2074,26 @@ a.wlrow { text-decoration: none; }
       g1.appendChild(statTile("Volume (lb)", bigNum(all.vol))); g1.appendChild(statTile("Reps", all.reps.toLocaleString("en-US"))); g1.appendChild(statTile("Workouts", String(all.n)));
       c1.appendChild(g1);
       viewEl.appendChild(c1);
-
+    }
+    {
       // Workout log: newest first, the day and the workout's name.
       var done = L.filter(function (x) { return x.done; });
+      activities().forEach(function (a) { done.push({ act: a, date: a.date }); });
       stravaLoad(false);
       (STRAVA.list && stravaInfo().connected ? STRAVA.list : []).forEach(function (a) { done.push({ strava: a, date: a.date }); });
       done.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
-      if (done.length) {
+      {
         var c5 = el("section", "card wlog");
-        c5.appendChild(el("h3", null, "Workout log"));
+        var lh = el("div", "wlhead");
+        lh.appendChild(el("h3", null, "Workout log"));
+        var ab = el("button", "addact", "+ Add activity"); ab.type = "button";
+        ab.addEventListener("click", function () { actForm = { kind: "Class", date: isoDay() }; render(); window.scrollTo(0, 0); });
+        lh.appendChild(ab);
+        c5.appendChild(lh);
+        if (!done.length) c5.appendChild(el("p", "hsub", "Your workouts show up here. Did a class or a run? Add it so it sits next to them."));
         done.forEach(function (x) {
           if (x.strava) { c5.appendChild(stravaRow(x.strava)); return; }
+          if (x.act) { c5.appendChild(activityRow(x.act)); return; }
           var s0 = m.byId[x.id], r = el("button", "wlrow"); r.type = "button";
           var d = parseISO(x.date);
           var dc = el("span", "wld");
@@ -1988,11 +2107,6 @@ a.wlrow { text-decoration: none; }
         if (stravaInfo().connected && STRAVA.list) c5.appendChild(el("div", "pwst", "Strava activities: powered by Strava"));
         viewEl.appendChild(c5);
       }
-    }
-    if (!L.length) {
-      var e0 = el("section", "card");
-      e0.appendChild(el("p", "muted", "Your workouts show up here after your first one."));
-      viewEl.appendChild(e0);
     }
     var stc = stravaCard(); if (stc) viewEl.appendChild(stc);
     viewEl.appendChild(el("div", "foot", (data.client && data.client.name ? data.client.name + " · " : "") + "v" + VERSION));
