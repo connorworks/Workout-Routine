@@ -1,9 +1,9 @@
-// Workout Routine sync (starter kit, from v7).
+// Workout Routine sync (starter kit, from v8).
 // Paste this into your Sheet's Apps Script editor (Extensions > Apps Script), set PASSCODE, then deploy
 // as a web app: Execute as Me, Who has access Anyone. See README.md in the starter folder.
 // Receives sessions from the Workout Routine app and writes them to this Sheet,
 // sends the app its program from the Program, Program · Weeks and Program · Lifts tabs,
-// keeps training maxes on the Maxes tab in step with the app, and logs runs on the Running tab.
+// keeps training maxes on the Maxes tab in step with the app, and logs activities (classes, runs and more) on the Activities tab.
 // Rows are matched on Block + Session ID, so re-sending a session updates it instead of duplicating it.
 
 // The passcode you type into the app. Pick your own and keep the quotes.
@@ -116,33 +116,44 @@ function writeMaxes(ss, m) {
   });
 }
 
-// One run. r = { id, block, date, mi, time, pace, deleted }. Matched on Run ID; a deleted run's row is removed.
+// One activity from the app (a class, a run or anything else). r = { id, block, date, kind, name, where, mi, time,
+// pace, minutes, deleted }. Matched on ID on the Activities tab; a deleted one's row is removed.
+const ACT_HEAD = ['Block', 'ID', 'Date', 'Type', 'Name', 'Studio', 'Distance (mi)', 'Time', 'Pace (/mi)', 'Minutes', 'Logged'];
 function writeRun(ss, r) {
-  let sh = ss.getSheetByName('Running');
+  let sh = ss.getSheetByName('Activities');
   if (!sh) {
-    sh = ss.insertSheet('Running');
-    sh.getRange(1, 1, 1, 7).setValues([['Block', 'Run ID', 'Date', 'Distance (mi)', 'Time', 'Pace (/mi)', 'Logged']]).setFontWeight('bold');
+    sh = ss.insertSheet('Activities');
+    sh.getRange(1, 1, 1, ACT_HEAD.length).setValues([ACT_HEAD]).setFontWeight('bold');
     sh.setFrozenRows(1);
-    sh.getRange('E:F').setNumberFormat('@'); // keep 28:30 as text, not a clock time
+    sh.getRange('H:I').setNumberFormat('@'); // keep 28:30 as text, not a clock time
   }
   const id = String(r.id || ''); if (!id) return;
   const last = sh.getLastRow();
   const ids = last > 1 ? sh.getRange(2, 2, last - 1, 1).getValues().map(function (x) { return String(x[0]); }) : [];
   const at = ids.indexOf(id) + 2;
   if (r.deleted) { if (at >= 2) sh.deleteRow(at); return; }
-  const tz = ss.getSpreadsheetTimeZone();
-  const row = [String(r.block || ''), id, String(r.date || ''), Number(r.mi) || 0, String(r.time || ''), String(r.pace || ''), Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm')];
+  const tz = ss.getSpreadsheetTimeZone(), mi = Number(r.mi) || 0;
+  const row = [String(r.block || ''), id, String(r.date || ''), String(r.kind || (mi > 0 ? 'Run' : 'Other')), String(r.name || ''),
+    String(r.where || ''), mi || '', String(r.time || ''), String(r.pace || ''), Number(r.minutes) || '',
+    Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm')];
   const target = at >= 2 ? at : last + 1;
-  sh.getRange(target, 5, 1, 2).setNumberFormat('@');
+  sh.getRange(target, 8, 1, 2).setNumberFormat('@');
   sh.getRange(target, 1, 1, row.length).setValues([row]);
 }
 
-// Every run, any block: [Block, Run ID, Date, Distance, Time].
+// Every activity, any block, for a phone restoring its history:
+// [Block, ID, Date, Distance, Time, Type, Name, Minutes, Studio]. Rows on the old Running tab (runs only) come too.
 function readRuns(ss) {
-  const sh = ss.getSheetByName('Running');
-  if (!sh || sh.getLastRow() < 2) return [];
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 5).getDisplayValues()
-    .filter(function (r) { return r[1]; });
+  const out = [];
+  const a = ss.getSheetByName('Activities');
+  if (a && a.getLastRow() > 1) a.getRange(2, 1, a.getLastRow() - 1, ACT_HEAD.length).getDisplayValues().forEach(function (r) {
+    if (r[1]) out.push([r[0], r[1], r[2], r[6], r[7], r[3], r[4], r[9], r[5]]);
+  });
+  const old = ss.getSheetByName('Running');
+  if (old && old.getLastRow() > 1) old.getRange(2, 1, old.getLastRow() - 1, 5).getDisplayValues().forEach(function (r) {
+    if (r[1]) out.push([r[0], r[1], r[2], r[3], r[4], 'Run', 'Run', '', '']);
+  });
+  return out;
 }
 
 // A week off from the app: new start dates for the block's weeks. w = { block, starts: [{ week, start: 'yyyy-mm-dd' }] }.

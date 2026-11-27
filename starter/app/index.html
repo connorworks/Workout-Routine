@@ -46,7 +46,24 @@ window.STARTER_PROGRAM = {"program": [["Week", "Lift", "Block", "Block name", "R
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Workout">
 <meta name="theme-color" content="#0E1115">
-<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.wlog .wlrow { display: grid; grid-template-columns: 64px 1fr; align-items: baseline; gap: 14px; width: 100%; background: none; border: none; border-top: 1px solid var(--line); padding: 14px 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.wlog h3 + .wlrow { border-top: none; }
+.wld { display: flex; flex-direction: column; gap: 3px; }
+.wld .md { font-weight: 700; }
+.wld .dw { color: var(--muted); font-size: 14px; }
+.wlrow .wlt { font-size: 17px; font-weight: 700; }
+.wlrow .wls { display: block; margin-top: 3px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.wlrow .actv { color: var(--accent); font-weight: 800; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.addactlink { display: block; margin: 8px auto 20px; font-size: 14px; font-weight: 500; color: var(--muted); text-align: center; }
+.actkinds { display: flex; gap: 8px; }
+.actkinds button { flex: 1; min-height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.actkinds button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.actf { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 14px; }
+.actf input { height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-size: 16px; padding: 0 10px; }
+.actf input::placeholder, .runin input::placeholder { color: var(--muted); opacity: .55; }
+.actdel { align-self: center; color: var(--test); }
+.runf[hidden], .actf[hidden] { display: none; }
+</style>
 <script>
 /* Standalone storage: stands in for Claude's page database by saving to this phone (localStorage). */
 (function () {
@@ -551,15 +568,20 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
 
 <div class="syncdlg" id="rundlg" hidden role="dialog" aria-modal="true" aria-labelledby="rundlg-t">
   <div class="syncdlg-in">
-    <h3 id="rundlg-t">Add a run</h3>
-    <p class="muted" id="run-date"></p>
-    <label class="runf"><span>Distance</span><span class="runin"><input type="text" inputmode="decimal" id="run-mi" placeholder="3.1" autocomplete="off"><span class="muted">mi</span></span></label>
-    <div class="runf"><span>Time</span><span class="runin"><input type="text" inputmode="numeric" id="run-min" placeholder="28" aria-label="Minutes" autocomplete="off"><span class="muted">min</span><input type="text" inputmode="numeric" id="run-sec" placeholder="00" aria-label="Seconds" autocomplete="off"><span class="muted">sec</span></span></div>
-    <p class="err" id="run-err" hidden>Enter a distance and a time.</p>
+    <h3 id="rundlg-t">Add an activity</h3>
+    <div class="actkinds" id="act-kinds"><button type="button" data-k="Class">Class</button><button type="button" data-k="Run">Run</button><button type="button" data-k="Other">Other</button></div>
+    <label class="actf"><span id="act-name-l">Class name</span><input type="text" id="act-name" placeholder="Reformer Tempo" autocomplete="off"></label>
+    <label class="actf" id="act-where-f"><span>Studio (optional)</span><input type="text" id="act-where" placeholder="Fitler Club" autocomplete="off"></label>
+    <label class="runf" id="act-mi-f"><span>Distance</span><span class="runin"><input type="text" inputmode="decimal" id="run-mi" placeholder="3.1" autocomplete="off"><span class="muted">mi</span></span></label>
+    <div class="runf" id="act-time-f"><span>Time</span><span class="runin"><input type="text" inputmode="numeric" id="run-min" placeholder="28" aria-label="Minutes" autocomplete="off"><span class="muted">min</span><input type="text" inputmode="numeric" id="run-sec" placeholder="00" aria-label="Seconds" autocomplete="off"><span class="muted">sec</span></span></div>
+    <label class="runf" id="act-mins-f"><span>Minutes (optional)</span><span class="runin"><input type="text" inputmode="numeric" id="act-mins" placeholder="45" autocomplete="off"><span class="muted">min</span></span></label>
+    <label class="actf"><span>Date</span><input type="date" id="act-date"></label>
+    <p class="err" id="run-err" hidden></p>
     <div class="syncdlg-btns">
       <button type="button" id="run-cancel">Cancel</button>
-      <button type="button" id="run-save" class="go">Save run</button>
+      <button type="button" id="run-save" class="go">Save</button>
     </div>
+    <button type="button" class="linkbtn actdel" id="act-del" hidden>Delete this activity</button>
   </div>
 </div>
 
@@ -629,7 +651,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "39 · Nov 26";
+  var APP_VERSION = "40 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1427,7 +1449,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     var cur = sel || nowPick;
     document.getElementById("ctx").textContent = view === "week" ? BLOCK + " Block · Week " + weekSel + " of " + WEEKS.length : (cur.extra ? BLOCK + " Block · Extra session" : BLOCK + " Block · Week " + cur.week + " of " + WEEKS.length);
     viewEl.innerHTML = "";
-    if (view === "today") { renderToday(); viewEl.appendChild(runButton("I went for a run")); }
+    if (view === "today") { renderToday(); viewEl.appendChild(actLink()); }
     else if (view === "week") renderWeek();
     else if (view === "log") renderLog();
     else renderMaxes();
@@ -2805,126 +2827,23 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
 
   function renderLog() {
     var ids = loggedIds();
-    var all = { vol: 0, reps: 0, n: 0, min: 0 }, wk = {};
-    ids.forEach(function (id) {
-      var st = statsOf(id), lg = logs[id];
-      all.vol += st.vol; all.reps += st.reps; all.min += st.min; if (lg.done) all.n++;
-      var m = id.match(/^w(\d+)-/); if (m) { var k = +m[1]; wk[k] = wk[k] || { vol: 0, reps: 0, n: 0, min: 0 }; wk[k].vol += st.vol; wk[k].reps += st.reps; wk[k].min += st.min; if (lg.done) wk[k].n++; }
-    });
-    if (!ids.length) {
-      var e = el("section", "hcard");
-      e.appendChild(el("h3", null, "Nothing logged yet"));
-      e.appendChild(el("p", "muted", dbState === "none" ? "Open this page signed in to claude.ai to save sets." : "Check off sets on the Today tab and your stats show up here."));
-      viewEl.appendChild(e);
-      renderRunsCard();
-      return;
-    }
-    var first = ids.map(sessDate).sort()[0];
+    var all = { vol: 0, reps: 0, n: 0 };
+    ids.forEach(function (id) { var st = statsOf(id); all.vol += st.vol; all.reps += st.reps; if (logs[id].done) all.n++; });
+    var acts = actList();
 
     // Lifetime
-    var c1 = el("section", "hcard");
-    c1.appendChild(el("h3", null, "Lifetime"));
-    c1.appendChild(el("p", "hsub", "Since " + longDay(parseISO(first))));
-    var g1 = el("div", "stats");
-    g1.appendChild(statBlock("Volume (lb)", bigNum(all.vol)));
-    g1.appendChild(statBlock("Reps", all.reps.toLocaleString("en-US")));
-    g1.appendChild(statBlock("Sessions", String(all.n)));
-    c1.appendChild(g1);
-    viewEl.appendChild(c1);
-
-    // This week
-    var cw = (nowPick && nowPick.week) || 1;
-    for (var i = WEEKS.length - 1; i >= 0; i--) if (today >= WEEKS[i].start) { cw = WEEKS[i].n; break; }
-    var tw = wk[cw] || { vol: 0, reps: 0, n: 0, min: 0 };
-    var planned = 0; for (var l = 1; l <= 4; l++) { var ss = SESS[l][cw - 1]; if (ss && !ss.off) planned++; }
-    var c2 = el("section", "hcard");
-    c2.appendChild(el("h3", null, "This week"));
-    c2.appendChild(el("p", "hsub", "Week " + cw + " · " + WEEKS[cw - 1].phase + " · " + tw.n + " of " + planned + " lifts done"));
-    var g2 = el("div", "stats");
-    g2.appendChild(statBlock("Volume (lb)", bigNum(tw.vol)));
-    g2.appendChild(statBlock("Reps", tw.reps.toLocaleString("en-US")));
-    g2.appendChild(statBlock("Hours", (Math.round(tw.min / 6) / 10).toString()));
-    c2.appendChild(g2);
-    viewEl.appendChild(c2);
-
-    // Weekly volume
-    var c3 = el("section", "hcard");
-    c3.appendChild(el("h3", null, "Weekly volume"));
-    c3.appendChild(el("p", "hsub", "Pounds moved per block week. Tap a bar."));
-    var max = 1; WEEKS.forEach(function (w) { if (wk[w.n] && wk[w.n].vol > max) max = wk[w.n].vol; });
-    var bars = el("div", "bars"); bars.setAttribute("role", "img");
-    bars.setAttribute("aria-label", "Weekly volume: " + WEEKS.map(function (w) { return "week " + w.n + " " + ((wk[w.n] || {}).vol || 0) + " lb"; }).join(", "));
-    var ro = el("div", "readout");
-    function readout(n) { var v = wk[n] || { vol: 0, reps: 0, n: 0 }; ro.textContent = "Week " + n + ": " + v.vol.toLocaleString("en-US") + " lb · " + v.reps + " reps · " + v.n + " lifts"; }
-    if (barSel == null) barSel = cw;
-    WEEKS.forEach(function (w) {
-      var v = (wk[w.n] || {}).vol || 0;
-      var b = el("button", "barc" + (w.start > today ? " future" : "")); b.type = "button";
-      b.setAttribute("aria-pressed", String(w.n === barSel));
-      b.setAttribute("aria-label", "Week " + w.n + ", " + v + " pounds");
-      var f = el("div", "bf"); f.style.height = (v ? Math.max(3, 100 * v / max) : 0) + "%";
-      b.appendChild(f);
-      b.addEventListener("click", function () { barSel = w.n; Array.prototype.forEach.call(bars.children, function (x, j) { x.setAttribute("aria-pressed", String(j === w.n - 1)); }); readout(w.n); });
-      b.addEventListener("mouseenter", function () { readout(w.n); });
-      bars.appendChild(b);
-    });
-    c3.appendChild(bars);
-    var bx = el("div", "barx"); WEEKS.forEach(function (w) { bx.appendChild(el("span", w.n === cw ? "now" : null, "W" + w.n)); }); c3.appendChild(bx);
-    readout(barSel);
-    c3.appendChild(ro);
-    viewEl.appendChild(c3);
-
-    // Lift history: barbell and key lifts first, tap one to see every session.
-    var groups = {}, order = [];
-    ids.forEach(function (id) {
-      var s = sessDef(id); if (!s || !s.blocks) return;
-      s.blocks.forEach(function (b) { b.items.forEach(function (it) {
-        if (it.log !== "top" && it.log !== "load") return;
-        var key = normName(it.n);
-        if (!groups[key]) { groups[key] = { name: it.n, key: key, main: it.main || null, bar: perSet(it) }; order.push(key); }
-      }); });
-    });
-    var mainOrder = ["squat", "bench", "clean", "press", "trap"];
-    var keyL = [], moreL = [];
-    order.forEach(function (k) {
-      var g = groups[k]; g.list = liftHistory(g.name);
-      if (!g.list.length) return;
-      g.name = g.main ? TM_NAMES[g.main] : g.list[0].n;
-      (g.main || g.bar ? keyL : moreL).push(g);
-    });
-    keyL.sort(function (a, b) {
-      var ia = a.main ? mainOrder.indexOf(a.main) : 99, ib = b.main ? mainOrder.indexOf(b.main) : 99;
-      return ia - ib || a.name.localeCompare(b.name);
-    });
-    moreL.sort(function (a, b) { return a.name.localeCompare(b.name); });
-    if (keyL.length || moreL.length) {
-      var c4b = el("section", "hcard");
-      c4b.appendChild(el("h3", null, "Lift history"));
-      c4b.appendChild(el("p", "hsub", "Tap a lift to see every session."));
-      var lhRow = function (g) {
-        var d = el("details", "lh");
-        var sm = el("summary");
-        sm.appendChild(el("span", "n", g.name));
-        sm.appendChild(el("span", "c", g.list.length + (g.list.length === 1 ? " session" : " sessions") + " · " + short(parseISO(g.list[0].date))));
-        d.appendChild(sm);
-        d.appendChild(histList(g.list, g.name));
-        return d;
-      };
-      keyL.forEach(function (g) { c4b.appendChild(lhRow(g)); });
-      if (moreL.length) {
-        var more = el("details", "lh more");
-        var ms = el("summary"); ms.appendChild(el("span", "n", "More lifts")); ms.appendChild(el("span", "c", moreL.length + " lifts"));
-        more.appendChild(ms);
-        var mi = el("div", "lhin");
-        moreL.forEach(function (g) { mi.appendChild(lhRow(g)); });
-        more.appendChild(mi);
-        c4b.appendChild(more);
-      }
-      viewEl.appendChild(c4b);
+    if (ids.length) {
+      var first = ids.map(sessDate).sort()[0];
+      var c1 = el("section", "hcard");
+      c1.appendChild(el("h3", null, "Lifetime"));
+      c1.appendChild(el("p", "hsub", "Since " + longDay(parseISO(first))));
+      var g1 = el("div", "stats");
+      g1.appendChild(statBlock("Volume (lb)", bigNum(all.vol)));
+      g1.appendChild(statBlock("Reps", all.reps.toLocaleString("en-US")));
+      g1.appendChild(statBlock("Sessions", String(all.n)));
+      c1.appendChild(g1);
+      viewEl.appendChild(c1);
     }
-
-    // Runs
-    renderRunsCard();
 
     // Body weight
     var bwk = Object.keys(bodyweight).filter(function (k) { return bodyweight[k] && bodyweight[k].lb != null; }).sort();
@@ -2941,90 +2860,121 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     }
     viewEl.appendChild(c6);
 
-    // Sessions, newest first
-    var c7 = el("section", "hcard");
+    // Sessions and activities, newest first: the day and the name.
+    var items = [];
+    ids.forEach(function (id) { items.push({ date: sessDate(id), id: id }); });
+    acts.forEach(function (a) { items.push({ date: a.date, act: a }); });
+    items.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)) || (a.act ? 1 : -1); });
+    var c7 = el("section", "hcard wlog");
     c7.appendChild(el("h3", null, "Sessions"));
-    var list = el("div", "hlist");
-    ids.forEach(function (id) {
-      var lg = logs[id], st = statsOf(id);
-      var row = el("button", "lrow"); row.type = "button";
-      row.appendChild(el("span", "lt", short(parseISO(sessDate(id))) + " · " + sessTitle(id)));
-      row.appendChild(el("span", "status " + (lg.done ? "done" : "part"), lg.done ? "Done" : "Logged"));
-      var ls = el("span", "ls");
-      ls.appendChild(el("span", null, [lg.minutes ? lg.minutes + " min" : null, st.vol ? st.vol.toLocaleString("en-US") + " lb" : null, st.reps ? st.reps + " reps" : null].filter(Boolean).join(" · ")));
-      st.tops.forEach(function (t) { ls.appendChild(el("span", null, t)); });
-      var s = sessDef(id);
-      s.blocks.forEach(function (b) { b.items.forEach(function (it) { var v = (lg.items || {})[it.k]; if (it.log === "score" && v && v.s) ls.appendChild(el("span", null, it.n + ": " + v.s)); }); });
-      row.appendChild(ls);
-      row.addEventListener("click", function () {
+    if (!items.length) c7.appendChild(el("p", "muted", dbState === "none" ? "Open this page signed in to claude.ai to save sets." : "Your sessions show up here after you log one."));
+    items.forEach(function (x) {
+      if (x.act) {
+        var a = x.act, k = actKind(a), bits = [];
+        if (a.where) bits.push(a.where);
+        if (k === "Run" && a.mi > 0) { bits.push(a.mi + " mi"); if (a.sec > 0) { bits.push(fmtDur(a.sec)); bits.push(fmtDur(a.sec / a.mi) + "/mi"); } }
+        else if (a.minutes) bits.push(a.minutes + " min");
+        c7.appendChild(logRow(a.date, a.name || k, k, bits.join(" · "), function () { openAct(a); }));
+        return;
+      }
+      var id = x.id, lg = logs[id];
+      c7.appendChild(logRow(x.date, sessTitle(id), lg.done ? "" : "Logged", "", function () {
         var m = id.match(/^w(\d+)-l(\d+)$/);
         sel = m ? { week: +m[1], lift: +m[2] } : { extra: id }; go("today", true);
-      });
-      list.appendChild(row);
+      }));
     });
-    c7.appendChild(list);
     viewEl.appendChild(c7);
   }
 
-  // ---------- Runs ----------
-  // A run is just distance and time, saved with today's date. Pace is worked out here.
+  // ---------- Activities ----------
+  // Anything outside the program: a class, a run or something else. Kept in the "runs" collection (the name is
+  // older than the feature) and synced to the Sheet's Activities tab. Runs get pace worked out; nothing here
+  // counts as a lift.
   function fmtDur(sec) { sec = Math.round(sec); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; return (h ? h + ":" + (m < 10 ? "0" : "") : "") + m + ":" + (x < 10 ? "0" : "") + x; }
-  function runPace(r) { return r.mi > 0 && r.sec > 0 ? fmtDur(r.sec / r.mi) + "/mi" : "—"; }
-  function runList() { return Object.keys(runs).filter(function (k) { return runs[k] && !runs[k].deleted && runs[k].mi > 0; }).map(function (k) { return Object.assign({ id: k }, runs[k]); }).sort(function (a, b) { return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); }); }
-  function runButton(label) {
-    var b = el("button", "runbtn", label || "Add a run"); b.type = "button";
-    b.addEventListener("click", function () { openRun(); });
+  function actKind(r) { return r.kind || (r.mi > 0 ? "Run" : "Other"); }
+  function actList() {
+    return Object.keys(runs).filter(function (k) { var r = runs[k]; return r && !r.deleted && (r.mi > 0 || r.name); })
+      .map(function (k) { return Object.assign({ id: k }, runs[k]); });
+  }
+  function actLink() {
+    var b = el("button", "linkbtn addactlink", "+ Did a class or run? Add it"); b.type = "button";
+    b.addEventListener("click", function () { openAct(null); });
     return b;
   }
-  function openRun() {
-    var d = $("rundlg"); if (!d || !db) return;
-    $("run-mi").value = ""; $("run-min").value = ""; $("run-sec").value = ""; $("run-err").hidden = true;
-    $("run-date").textContent = longDay(parseISO(today));
-    d.hidden = false;
-    setTimeout(function () { try { $("run-mi").focus(); } catch (e) {} }, 50);
+  var actCur = { kind: "Class", id: null };
+  function actShow() {
+    var k = actCur.kind;
+    Array.prototype.forEach.call($("act-kinds").children, function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-k") === k)); });
+    $("act-name-l").textContent = k === "Class" ? "Class name" : "Name";
+    $("act-name").placeholder = k === "Class" ? "Reformer Tempo" : k === "Run" ? "Morning run" : "Tennis";
+    $("act-where-f").hidden = k !== "Class";
+    $("act-mi-f").hidden = $("act-time-f").hidden = k !== "Run";
+    $("act-mins-f").hidden = k === "Run";
+    $("run-err").hidden = true;
   }
-  function saveRun() {
-    var mi = parseFloat($("run-mi").value), mn = parseInt($("run-min").value || "0", 10), sc = parseInt($("run-sec").value || "0", 10);
-    var sec = (isFinite(mn) ? mn : 0) * 60 + (isFinite(sc) ? sc : 0);
-    if (!(mi > 0) || !(sec > 0) || mi > 200) { $("run-err").hidden = false; return; }
-    var id = "r-" + Date.now();
-    db.doc("runs/" + id).set({ date: today, mi: Math.round(mi * 100) / 100, sec: sec, updatedAt: new Date().toISOString() });
+  function openAct(r) {
+    var d = $("rundlg"); if (!d || !db) return;
+    actCur = { kind: r ? actKind(r) : "Class", id: r ? r.id : null };
+    $("rundlg-t").textContent = r ? "Edit activity" : "Add an activity";
+    $("act-name").value = r ? r.name || "" : "";
+    $("act-where").value = r ? r.where || "" : "";
+    $("run-mi").value = r && r.mi ? r.mi : "";
+    $("run-min").value = r && r.sec ? Math.floor(r.sec / 60) : "";
+    $("run-sec").value = r && r.sec ? (r.sec % 60 < 10 ? "0" : "") + r.sec % 60 : "";
+    $("act-mins").value = r && r.minutes ? r.minutes : "";
+    $("act-date").value = r ? r.date : today; $("act-date").max = today;
+    $("act-del").hidden = !r;
+    actShow();
+    d.hidden = false;
+    if (!r) setTimeout(function () { try { $("act-name").focus(); } catch (e) {} }, 50);
+  }
+  function actErr(t) { $("run-err").textContent = t; $("run-err").hidden = false; }
+  function saveAct() {
+    var k = actCur.kind, name = $("act-name").value.trim(), date = $("act-date").value;
+    var doc = { kind: k, name: name || (k === "Run" ? "Run" : ""), date: date, updatedAt: new Date().toISOString() };
+    if (!doc.name) return actErr("Add a name.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return actErr("Pick a date.");
+    if (k === "Run") {
+      var mi = parseFloat($("run-mi").value), mn = parseInt($("run-min").value || "0", 10), sc = parseInt($("run-sec").value || "0", 10);
+      var sec = (isFinite(mn) ? mn : 0) * 60 + (isFinite(sc) ? sc : 0);
+      if (!(mi > 0) || !(sec > 0) || mi > 200) return actErr("Enter a distance and a time.");
+      doc.mi = Math.round(mi * 100) / 100; doc.sec = sec;
+    } else {
+      var m2 = parseInt($("act-mins").value, 10);
+      if (m2 > 0) doc.minutes = m2;
+      if (k === "Class" && $("act-where").value.trim()) doc.where = $("act-where").value.trim();
+    }
+    db.doc("runs/" + (actCur.id || "r-" + Date.now())).set(doc);
     $("rundlg").hidden = true;
   }
-  function deleteRun(id) {
-    if (!runs[id]) return;
+  function deleteAct() {
+    var id = actCur.id; if (!id || !runs[id]) return;
     db.doc("runs/" + id).set(Object.assign({}, runs[id], { deleted: true, updatedAt: new Date().toISOString() }));
-  }
-  function renderRunsCard() {
-    var list = runList();
-    var c = el("section", "hcard");
-    c.appendChild(el("h3", null, "Runs"));
-    var wkStart = iso(addDays(parseISO(today), -((parseISO(today).getDay() + 6) % 7)));
-    var wkMi = 0; list.forEach(function (r) { if (r.date >= wkStart && r.date <= today) wkMi += r.mi; });
-    c.appendChild(el("p", "hsub", list.length ? (Math.round(wkMi * 10) / 10) + " mi this week (since Monday) · " + list.length + (list.length === 1 ? " run" : " runs") + " logged" : "Log a run with just distance and time."));
-    if (list.length) {
-      var hl = el("div", "hlist");
-      list.slice(0, 20).forEach(function (r) {
-        var row = el("div", "lrow runrow");
-        row.appendChild(el("span", "lt", short(parseISO(r.date)) + " · " + r.mi + " mi"));
-        var del = el("button", "rundel", "Delete"); del.type = "button";
-        del.setAttribute("aria-label", "Delete run on " + short(parseISO(r.date)));
-        del.addEventListener("click", function () { if (del.getAttribute("data-c")) deleteRun(r.id); else { del.setAttribute("data-c", "1"); del.textContent = "Tap to confirm"; } });
-        row.appendChild(del);
-        var ls = el("span", "ls"); ls.appendChild(el("span", null, fmtDur(r.sec) + " · " + runPace(r))); row.appendChild(ls);
-        hl.appendChild(row);
-      });
-      c.appendChild(hl);
-    }
-    c.appendChild(runButton());
-    viewEl.appendChild(c);
+    $("rundlg").hidden = true;
   }
   (function () {
     var d = $("rundlg"); if (!d) return;
+    Array.prototype.forEach.call($("act-kinds").children, function (b) { b.addEventListener("click", function () { actCur.kind = b.getAttribute("data-k"); actShow(); }); });
     $("run-cancel").addEventListener("click", function () { d.hidden = true; });
-    $("run-save").addEventListener("click", saveRun);
-    ["run-mi", "run-min", "run-sec"].forEach(function (k) { $(k).addEventListener("keydown", function (e) { if (e.key === "Enter") saveRun(); }); $(k).addEventListener("input", function () { $("run-err").hidden = true; }); });
+    $("run-save").addEventListener("click", saveAct);
+    $("act-del").addEventListener("click", deleteAct);
+    ["act-name", "act-where", "run-mi", "run-min", "run-sec", "act-mins"].forEach(function (k) {
+      $(k).addEventListener("keydown", function (e) { if (e.key === "Enter") saveAct(); });
+      $(k).addEventListener("input", function () { $("run-err").hidden = true; });
+    });
   })();
+  function logRow(dt, title, tag, sub, onClick) {
+    var r = el("button", "wlrow"); r.type = "button";
+    var d = parseISO(dt), dc = el("span", "wld");
+    dc.appendChild(el("span", "md", short(d)));
+    dc.appendChild(el("span", "dw", d.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })));
+    r.appendChild(dc);
+    var t = el("span", "wlt", title);
+    if (tag || sub) { var s2 = el("span", "wls"); if (tag) s2.appendChild(el("span", "actv", tag)); if (sub) s2.appendChild(document.createTextNode((tag ? " " : "") + sub)); t.appendChild(s2); }
+    r.appendChild(t);
+    r.addEventListener("click", onClick);
+    return r;
+  }
 
   // ---------- Maxes ----------
   function renderMaxes() {
@@ -3436,10 +3386,16 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
           window.__wrPut("bodyweight", "w" + wk, { week: wk, lb: lb, updatedAt: /^\d{4}-\d{2}-\d{2}$/.test(dd) ? dd + "T12:00:00.000Z" : new Date().toISOString() });
         });
         var haveR = d.runs || {};
+        // Rows: [Block, ID, Date, Distance, Time, Type, Name, Minutes, Studio]; scripts before v8 send the first five.
         (res.runs || []).forEach(function (row) {
-          var id = String(row[1] || ""), mi = Number(row[3]), sec = secOf(row[4]);
-          if (!id || haveR[id] || !(mi > 0) || !(sec > 0)) return;
-          window.__wrPut("runs", id, { date: String(row[2] || "").slice(0, 10), mi: mi, sec: sec, updatedAt: new Date().toISOString() });
+          var id = String(row[1] || ""), mi = Number(row[3]) || 0, sec = secOf(row[4]) || 0, kind = String(row[5] || (mi > 0 ? "Run" : ""));
+          if (!id || haveR[id] || !kind) return;
+          if (kind === "Run" && !(mi > 0 && sec > 0)) return;
+          var doc = { kind: kind, name: String(row[6] || (kind === "Run" ? "Run" : "")), date: String(row[2] || "").slice(0, 10), updatedAt: new Date().toISOString() };
+          if (mi > 0) { doc.mi = mi; doc.sec = sec; }
+          if (Number(row[7]) > 0) doc.minutes = Number(row[7]);
+          if (row[8]) doc.where = String(row[8]);
+          window.__wrPut("runs", id, doc);
         });
         put(RESTORED, new Date().toISOString());
       }, function () { restoring = false; });
@@ -3470,8 +3426,9 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
       if (!doc) return;
       if (col === "runs") {
         var pace = doc.mi > 0 && doc.sec > 0 ? Math.round(doc.sec / doc.mi) : 0;
-        (body.runs = body.runs || []).push({ id: id, block: window.WR.block, date: doc.date, mi: doc.mi, sec: doc.sec,
-          time: fmt(doc.sec), pace: pace ? fmt(pace) : "", deleted: !!doc.deleted });
+        (body.runs = body.runs || []).push({ id: id, block: window.WR.block, date: doc.date, mi: doc.mi || 0, sec: doc.sec || 0,
+          time: doc.sec ? fmt(doc.sec) : "", pace: pace ? fmt(pace) : "", deleted: !!doc.deleted,
+          kind: doc.kind || (doc.mi > 0 ? "Run" : "Other"), name: doc.name || "", where: doc.where || "", minutes: doc.minutes || "" });
         return;
       }
       try {
