@@ -329,7 +329,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "34";
+  var VERSION = "35";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -984,7 +984,6 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     });
     var mon = null, lab = "";
     if (!off[thisMon] && left.length) { mon = thisMon; lab = "this week"; }
-    else if (!off[thisMon] && !off[nextMon]) { mon = nextMon; lab = "next week"; }
     if (mon) {
       var ask = mon === thisMon ? "Behind? Push " + (left.length === 1 ? "this workout" : "these " + left.length + " workouts") + " to next week" : "Need a break? Skip next week";
       var b = el("button", "linkbtn", ask); b.type = "button";
