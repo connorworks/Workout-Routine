@@ -194,6 +194,7 @@ p { margin: 0; }
 .rundel { border: none; background: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 4px 0 4px 8px; }
 .rundel[data-c] { color: var(--test); font-weight: 700; }
 .woff { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.pad > .woff:first-child { margin-top: 0; }
 .woff p { margin: 0; }
 .woffbtns { display: flex; gap: 10px; }
 .woff .btn { min-height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; padding: 0 14px; }
@@ -467,8 +468,6 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
 .tag.done { background: var(--ok-soft); color: var(--ok); }
 .tag.prog { background: var(--accent-soft); color: var(--accent); }
 .tag.miss { background: var(--test-soft); color: var(--test); }
-.whd { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.whd .muted { font-size: 14px; }
 .rail { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
 .wk { flex: 0 0 auto; min-width: 96px; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; text-align: left; }
 .wk .n { font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1; }
@@ -676,7 +675,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "45 · Nov 26";
+  var APP_VERSION = "46 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -2737,13 +2736,8 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     viewEl.appendChild(rows);
 
     var card = el("section", "card");
-    var pad = el("div", "pad");
-    var hd = el("div", "whd"); hd.appendChild(el("span", "pill" + (w.test ? " test" : ""), w.phase + " week"));
-    hd.appendChild(el("span", "muted", short(start) + " – " + short(addDays(start, 6))));
-    pad.appendChild(hd);
-    if (w.intent) pad.appendChild(el("p", "muted", w.intent));
-    var wob = weekOffBox(w); if (wob) pad.appendChild(wob);
-    card.appendChild(pad);
+    var wob = weekOffBox(w);
+    if (wob) { var pad = el("div", "pad"); pad.appendChild(wob); card.appendChild(pad); }
     var bw = el("div", "bw");
     var lab = el("label", null, "Weigh-in"); lab.setAttribute("for", "bw-input");
     bw.appendChild(lab);
