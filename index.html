@@ -281,6 +281,11 @@ details.warm p { padding: 0 16px 14px; font-size: 15px; }
 .abscap { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 15px; }
 .abst { font-weight: 700; }
 .absyt { color: var(--accent, #1E4FD6); font-weight: 600; white-space: nowrap; }
+.tmhow summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 6px 0 0; list-style: none; }
+.tmhow summary::-webkit-details-marker { display: none; }
+.tmhow summary::after { content: " ▾"; font-size: 11px; }
+.tmhow[open] summary::after { content: " ▴"; }
+.tmhow p { margin-top: 8px; }
 .absmore summary { cursor: pointer; color: var(--muted); font-size: 14px; padding: 4px 0; }
 .absopt { display: block; width: 100%; text-align: left; min-height: 44px; padding: 10px 12px; margin-top: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); color: var(--ink); font: inherit; cursor: pointer; }
 .block { padding: 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
@@ -561,8 +566,6 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
 .usebtn { min-height: 36px; padding: 0 12px; border-radius: 999px; border: none; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 13px; cursor: pointer; }
 .tmreset { font-size: 13px; }
 .appver { font-size: 12px; color: var(--muted); text-align: center; }
-.rules { margin: 0; padding: 0 16px 16px 34px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
-.src { font-size: 13px; color: var(--muted); padding: 0 16px 16px; }
 @media (prefers-reduced-motion: no-preference) { .sck, .dot, .donepill, .tb { transition: background-color .12s, color .12s, border-color .12s; } }
 </style>
 
@@ -673,7 +676,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "44 · Nov 26";
+  var APP_VERSION = "45 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -2998,8 +3001,12 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     var pad = el("div", "pad");
     pad.appendChild(el("h3", null, "Training maxes"));
     var tw = WEEKS.filter(function (x) { return x.test; })[0];
-    pad.appendChild(el("p", "muted", "Loads use 90% of your 1-rep maxes, the PPSA \"everyday max\": a weight you can hit on a bad day." + (tw ? " Retested in week " + tw.n + "." : "") + " Tap a training max to change it; every planned weight follows." + (SETTINGS.syncUrl ? " They're kept on the Maxes tab of your Google Sheet." : "")));
-    pad.appendChild(el("p", "muted", "Est. max is your best logged set on each lift, run through a rep-max formula and rounded down to 5."));
+    // The explanation is tucked into a dropdown so the numbers come first.
+    var how = el("details", "tmhow");
+    how.appendChild(el("summary", null, "How these work"));
+    how.appendChild(el("p", "muted", "Loads use 90% of your 1-rep maxes, the PPSA \"everyday max\": a weight you can hit on a bad day." + (tw ? " Retested in week " + tw.n + "." : "") + " Tap a training max to change it; every planned weight follows." + (SETTINGS.syncUrl ? " They're kept on the Maxes tab of your Google Sheet." : "")));
+    how.appendChild(el("p", "muted", "Est. max is your best logged set on each lift, run through a rep-max formula and rounded down to 5."));
+    pad.appendChild(how);
     card.appendChild(pad);
     var hdr = el("div", "tmrow");
     hdr.appendChild(el("span", "eyebrow", "Lift")); hdr.appendChild(el("span", "eyebrow", "1RM")); hdr.appendChild(el("span", "eyebrow", "Est. max")); hdr.appendChild(el("span", "eyebrow", "Training max"));
@@ -3035,18 +3042,6 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     });
     viewEl.appendChild(card);
 
-    var rc = el("section", "card");
-    if (BLOCK !== "Pre-Trek") rc.hidden = true; // these rules describe the Pre-Trek block only
-    var rp = el("div", "pad"); rp.appendChild(el("h3", null, "Rules for this block")); rc.appendChild(rp);
-    var ul = el("ul", "rules");
-    ["Never miss a rep. On test days, take a PR single only if 95% moves fast.",
-     "Legs stay heavy and low-rep. The 10 × 10 volume goes to upper body only.",
-     "Saturday's Metcon and Tuesday boxing are the hard conditioning days. Monday and Thursday finishers stay short.",
-     "Squats and deadlifts never go after Pilates. Friday is upper body only.",
-     "Sauna after Friday's lift: 15 minutes, about 160°F."].forEach(function (t) { ul.appendChild(el("li", null, t)); });
-    rc.appendChild(ul);
-    rc.appendChild(el("p", "src", "Built from Spring Training (percentage progressions, core series), 4 Horsemen (light–heavy–test waves), HIIB 100 and HIBB (10 × 10 and interval formats), and PPSA Pool Season / The Mullet (main lift, then high-rep supersets; fill in your weights)."));
-    viewEl.appendChild(rc);
     viewEl.appendChild(el("p", "appver", "App version " + APP_VERSION + (programFrom === "sheet" ? " · Program from your Google Sheet" : programFrom === "starter" ? " · Starter program" : " · Built-in program")));
   }
 
