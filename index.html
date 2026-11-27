@@ -249,6 +249,12 @@ p { margin: 0; }
 .classcard:not(.big) .ctime { font-size: 16px; }
 .cwhere { color: var(--muted); font-size: 15px; }
 .quote { font-size: 17px; line-height: 1.45; }
+.nextup { padding: 14px 16px 16px; border-top: 1px solid var(--line); background: var(--sunk); display: flex; flex-direction: column; gap: 4px; }
+.card > .nextup:first-child { border-top: none; }
+.nextup .nn { font-weight: 700; font-size: 16px; }
+.nextup .btnrow { display: flex; gap: 10px; margin-top: 10px; }
+.nextup .btn { flex: 1; min-height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; padding: 0 14px; }
+.nextup .btn:not(.ghost) { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .nextrow { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; min-height: 64px; border: none; border-top: 1px solid var(--line); background: var(--sunk); text-align: left; cursor: pointer; color: var(--ink); }
 .nextrow .nt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .nextrow .nn { font-weight: 700; font-size: 16px; }
@@ -647,7 +653,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
   var ONE_RM = Object.assign({}, ONE_RM_PLAN, recall("wr-1rm") || {});
   var TM = Object.assign({}, TM_PLAN, recall("wr-tm") || {});
   // Shown at the bottom of the Maxes tab; bump it with every update so it's easy to tell which version a phone has.
-  var APP_VERSION = "40 · Nov 26";
+  var APP_VERSION = "41 · Nov 26";
   var TM_NAMES = { squat: "Back squat", bench: "Bench press", trap: "Trap bar deadlift", press: "Strict press", clean: "Power clean" };
   var BARBELL = { squat: true, bench: true, press: true, clean: true };
 
@@ -1512,6 +1518,7 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     // A day with a class and no lift is a training day, led by the class.
     if (noLift && classes.length) {
       classes.forEach(function (e, i) { viewEl.appendChild(classCard(e, true, i === 0, i === classes.length - 1)); });
+      var nr = nextRow(); if (nr) { var nc = el("section", "card"); nc.appendChild(nr); viewEl.appendChild(nc); }
       return;
     }
     if (noLift) { viewEl.appendChild(renderRest()); return; }
@@ -1673,20 +1680,28 @@ input.w { width: 88px; } input.r { width: 64px; } input.s { width: 200px; max-wi
     return card;
   }
 
-  // One line to the next lift, which opens it if you want to train early.
+  // The next lift, with Preview (open it) and Do it today (move it to today, when it's in this week).
   function nextRow() {
     var nx = nowPick;
     var nxDate = nx && !nx.extra ? liftDate(nx.week, nx.lift) : null;
     var nxDef = nx && !nx.extra ? SESS[nx.lift][nx.week - 1] : null;
-    if (!(nxDate && iso(nxDate) >= today && nxDef && !nxDef.off)) return null;
-    var b = el("button", "nextrow"); b.type = "button";
-    var t = el("span", "nt");
-    t.appendChild(el("span", "eyebrow", "Next lift · " + longDay(nxDate)));
-    t.appendChild(el("span", "nn", LIFT_META[nx.lift].label + " · " + (nxDef.travel ? "Travel session" : LIFT_META[nx.lift].title)));
-    b.appendChild(t);
-    b.appendChild(el("span", "chev", "›"));
-    b.addEventListener("click", function () { sel = { week: nx.week, lift: nx.lift }; render(); window.scrollTo(0, 0); });
-    return b;
+    if (!(nxDate && iso(nxDate) > today && nxDef && !nxDef.off)) return null;
+    var box = el("div", "nextup");
+    box.appendChild(el("div", "eyebrow", "Next lift · " + longDay(nxDate)));
+    box.appendChild(el("div", "nn", LIFT_META[nx.lift].label + " · " + (nxDef.travel ? "Travel session" : LIFT_META[nx.lift].title)));
+    var row = el("div", "btnrow");
+    var vb = el("button", "btn ghost", "Preview"); vb.type = "button";
+    vb.addEventListener("click", function () { sel = { week: nx.week, lift: nx.lift }; render(); window.scrollTo(0, 0); });
+    row.appendChild(vb);
+    // A lift can only move within its own week, so Do it today shows when today is in that week.
+    var ws = WEEKS[nx.week - 1].start, ti = Math.round((parseISO(today) - parseISO(ws)) / 86400000);
+    if (ti >= 0 && ti <= 6) {
+      var nb = el("button", "btn", "Do it today"); nb.type = "button";
+      nb.addEventListener("click", function () { var p = { week: nx.week, lift: nx.lift }; editLog(docId(p.week, p.lift), function (d) { d.moved = today; }, true); sel = null; nowPick = p; render(); window.scrollTo(0, 0); });
+      row.appendChild(nb);
+    }
+    box.appendChild(row);
+    return box;
   }
 
   // ---------- Ab videos at the end of each workout ----------
