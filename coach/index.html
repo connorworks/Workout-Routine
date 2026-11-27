@@ -292,11 +292,17 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 .wlog { gap: 0; }
 .wlog h3 { margin-bottom: 6px; }
 .wlrow { display: grid; grid-template-columns: 72px 1fr; align-items: baseline; gap: 14px; width: 100%; background: none; border: none; border-top: 1px solid var(--line); padding: 16px 0; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
-.wlrow:first-of-type { border-top: none; }
+.wlog h3 + .wlrow { border-top: none; }
 .wld { display: flex; flex-direction: column; gap: 4px; }
 .wld .md { font-weight: 700; }
 .wld .dw { color: var(--muted); font-size: 14px; }
 .wlrow .wlt { font-size: 18px; font-weight: 700; }
+a.wlrow { text-decoration: none; }
+.wlrow .wls { display: block; margin-top: 4px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.wlrow .stv { color: #FC5200; font-weight: 800; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.pwst { font-size: 12px; color: var(--muted); padding-top: 10px; border-top: 1px solid var(--line); }
+.stbtn { min-height: 48px; border-radius: 12px; border: none; background: #FC5200; color: #fff; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; }
+.strow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 </style>
 </head>
 <body>
@@ -329,7 +335,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "36";
+  var VERSION = "37";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -379,10 +385,62 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
   var API = DEMO ? "" : (cfg.api || (cfg.k ? "https://script.google.com/macros/s/" + encodeURIComponent(cfg.k) + "/exec" : ""));
   var DKEY = "coach-data-" + WHO, LKEY = "coach-logs-" + WHO, QKEY = "coach-queue-" + WHO;
 
+  // ---------- Strava ----------
+  // A client can connect their own Strava; their activities show only in their app (never in the coach's Sheet).
+  // The coach's script holds the Strava keys and the client's sign-in, so it works from any phone once connected.
+  var STRAVA = { list: null, at: 0, busy: false, err: "" };
+  function stravaInfo() { return (data && data.strava) || { on: false }; }
+  function stravaReturnUrl() { return location.origin + location.pathname + "?k=" + encodeURIComponent(cfg.k || "") + "&c=" + encodeURIComponent(cfg.c || ""); }
+  function stravaConnect() {
+    var st = stravaInfo(); if (!st.clientId) return;
+    location.href = "https://www.strava.com/oauth/authorize?client_id=" + encodeURIComponent(st.clientId) +
+      "&response_type=code&approval_prompt=auto&scope=activity:read_all&state=strava&redirect_uri=" + encodeURIComponent(stravaReturnUrl());
+  }
+  function stravaCall(body, then) {
+    if (!API || !cfg.c) return;
+    fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(Object.assign({ client: cfg.c }, body)) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res && res.ok && res.strava && data) { data.strava = res.strava; save(DKEY, data); }
+        STRAVA.list = null; STRAVA.err = res && res.ok ? "" : (res && res.error) || "error";
+        then && then(res);
+      }, function () { STRAVA.err = "offline"; then && then(null); });
+  }
+  function stravaLoad(force) {
+    if (!API || !cfg.c || STRAVA.busy || !stravaInfo().connected) return;
+    if (!force && STRAVA.list && Date.now() - STRAVA.at < 300000) return;
+    STRAVA.busy = true;
+    fetch(API + "?client=" + encodeURIComponent(cfg.c) + "&strava=activities")
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        STRAVA.busy = false;
+        if (res && res.ok) { STRAVA.list = res.activities || []; STRAVA.at = Date.now(); STRAVA.err = ""; }
+        else { STRAVA.err = (res && res.error) || "error"; if (/revoked|not-connected/.test(STRAVA.err) && data && data.strava) data.strava.connected = false; }
+        if (view === "history") { var y = window.scrollY; render(); window.scrollTo(0, y); }
+      }, function () { STRAVA.busy = false; });
+  }
+  // Coming back from Strava: ?code=…&scope=…&state=strava on the app's own address.
+  (function () {
+    if (qs.get("state") !== "strava" || DEMO) return;
+    var code = qs.get("code"), scope = qs.get("scope") || "", denied = qs.get("error");
+    try { history.replaceState(null, "", stravaReturnUrl()); } catch (e) {}
+    STRAVA.goHistory = true;
+    if (denied || !code) { STRAVA.err = "strava-denied"; return; }
+    STRAVA.connecting = true;
+    setTimeout(function () {
+      stravaCall({ strava: { code: code, scope: scope } }, function (res) {
+        STRAVA.connecting = false;
+        if (res && res.ok) stravaLoad(true);
+        render();
+      });
+    }, 0);
+  })();
+
   var data = DEMO ? DEMO_DATA : load(DKEY);
   var logs = load(LKEY) || {};
   var queue = load(QKEY) || {};
   var view = "today", sel = null, pickWeek = null, loadError = "", syncState = "", M = null, R = null, MV = {}, PL = null;
+  if (STRAVA.goHistory) view = "history";
 
   // ---------- Small helpers ----------
   function el(tag, cls, text) {
@@ -1828,7 +1886,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     var c = el("section", "card track");
     var tot = 0, dn = 0, bn = 0; ws.forEach(function (x) { tot += x.n; dn += Math.min(x.done, x.n); if (x.bonus) bn++; });
     var hd = el("div", "trhead");
-    hd.appendChild(el("h3", null, "Your " + ws.length + " weeks"));
+    hd.appendChild(el("h3", null, ws.length === 1 ? "Your week" : "Your " + ws.length + " weeks"));
     hd.appendChild(el("span", "hsub", dn + " of " + tot + " workouts" + (bn ? " · " + bn + " bonus" : "")));
     c.appendChild(hd);
     var bar = el("div", "trbar"), fill = el("div"); fill.style.width = (tot ? Math.round(dn / tot * 100) : 0) + "%"; bar.appendChild(fill); c.appendChild(bar);
@@ -1846,6 +1904,45 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       c.appendChild(r);
     });
     viewEl.appendChild(c);
+  }
+
+  function stravaRow(a) {
+    var r = el("a", "wlrow"); r.href = "https://www.strava.com/activities/" + a.id; r.target = "_blank"; r.rel = "noopener";
+    var d = parseISO(a.date), dc = el("span", "wld");
+    dc.appendChild(el("span", "md", d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""));
+    dc.appendChild(el("span", "dw", d ? d.toLocaleDateString("en-US", { weekday: "short" }) : ""));
+    r.appendChild(dc);
+    var t = el("span", "wlt"); t.appendChild(document.createTextNode(a.name || a.type || "Activity"));
+    var bits = [a.type ? String(a.type).replace(/([a-z])([A-Z])/g, "$1 $2") : ""];
+    if (a.mi > 0) bits.push(a.mi.toFixed(2).replace(/\.?0+$/, "") + " mi");
+    if (a.sec > 0) { var h = Math.floor(a.sec / 3600), mm = Math.floor(a.sec % 3600 / 60), ss = a.sec % 60; bits.push((h ? h + ":" + (mm < 10 ? "0" : "") : "") + mm + ":" + (ss < 10 ? "0" : "") + ss); }
+    if (a.mi > 0.3 && a.sec > 0 && /run|walk|hike/i.test(a.type || "")) { var p = Math.round(a.sec / a.mi); bits.push(Math.floor(p / 60) + ":" + (p % 60 < 10 ? "0" : "") + p % 60 + "/mi"); }
+    var sub = el("span", "wls"); sub.appendChild(el("span", "stv", "Strava")); sub.appendChild(document.createTextNode(" " + bits.filter(String).join(" · ")));
+    t.appendChild(sub);
+    r.appendChild(t);
+    return r;
+  }
+  function stravaCard() {
+    var st = stravaInfo();
+    if (!st.on || DEMO) return null;
+    var c = el("section", "card strava");
+    if (STRAVA.connecting) { c.appendChild(el("p", "muted", "Connecting Strava…")); return c; }
+    if (!st.connected) {
+      c.appendChild(el("h3", null, "Strava"));
+      c.appendChild(el("p", "hsub", "See your runs and rides here next to your workouts. Only you see them."));
+      var b = el("button", "stbtn", "Connect with Strava"); b.type = "button"; b.addEventListener("click", stravaConnect);
+      c.appendChild(b);
+      if (STRAVA.err === "strava-denied" || STRAVA.err === "strava-scope") c.appendChild(el("p", "muted small", "Strava wasn't connected. To connect, allow access to your activities."));
+      else if (/strava-exchange/.test(STRAVA.err)) c.appendChild(el("p", "muted small", "Couldn't connect to Strava. Try again in a minute."));
+      return c;
+    }
+    var row = el("div", "strow");
+    row.appendChild(el("span", "hsub", "Strava connected" + (st.athlete ? " · " + st.athlete : "") + (STRAVA.busy && !STRAVA.list ? " · loading…" : "")));
+    var x = el("button", "linkbtn", "Disconnect"); x.type = "button";
+    x.addEventListener("click", function () { x.disabled = true; stravaCall({ strava: { disconnect: true } }, function () { render(); }); });
+    row.appendChild(x);
+    c.appendChild(row);
+    return c;
   }
 
   function renderHistory() {
@@ -1869,11 +1966,15 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       viewEl.appendChild(c1);
 
       // Workout log: newest first, the day and the workout's name.
-      var done = L.filter(function (x) { return x.done; }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+      var done = L.filter(function (x) { return x.done; });
+      stravaLoad(false);
+      (STRAVA.list && stravaInfo().connected ? STRAVA.list : []).forEach(function (a) { done.push({ strava: a, date: a.date }); });
+      done.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
       if (done.length) {
         var c5 = el("section", "card wlog");
         c5.appendChild(el("h3", null, "Workout log"));
         done.forEach(function (x) {
+          if (x.strava) { c5.appendChild(stravaRow(x.strava)); return; }
           var s0 = m.byId[x.id], r = el("button", "wlrow"); r.type = "button";
           var d = parseISO(x.date);
           var dc = el("span", "wld");
@@ -1884,6 +1985,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
           r.addEventListener("click", function () { open(x.id); });
           c5.appendChild(r);
         });
+        if (stravaInfo().connected && STRAVA.list) c5.appendChild(el("div", "pwst", "Strava activities: powered by Strava"));
         viewEl.appendChild(c5);
       }
     }
@@ -1892,6 +1994,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       e0.appendChild(el("p", "muted", "Your workouts show up here after your first one."));
       viewEl.appendChild(e0);
     }
+    var stc = stravaCard(); if (stc) viewEl.appendChild(stc);
     viewEl.appendChild(el("div", "foot", (data.client && data.client.name ? data.client.name + " · " : "") + "v" + VERSION));
   }
 
