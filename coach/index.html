@@ -329,7 +329,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 <script>
 (function () {
   "use strict";
-  var VERSION = "33";
+  var VERSION = "34";
 
   // Sample program for ?demo, so anyone can try the app without a coach's sheet.
   var DEMO_DATA = {
@@ -828,6 +828,7 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
 
   function render() {
     KP.close();
+    PL = null; // the schedule depends on what's done, so work it out fresh each time
     document.querySelectorAll(".tabs button").forEach(function (b) {
       if (b.dataset.v === view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
@@ -963,37 +964,47 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     logs[id] = { items: {}, notes: "", status: on ? "Skipped" : "Undone", date: mon };
     save(LKEY, logs); PL = null; queueSync(id, true); render(); window.scrollTo(0, 0);
   }
-  function weekBusy(mon) {
-    var end = isoDay(addDays(parseISO(mon), 6));
-    return model().sessions.some(function (x) { var d = (isStarted(x.id) || isDone(x.id)) && dateOf(x.id); return d && d >= mon && d <= end; });
-  }
+
   function weekOffCard() {
     if (!plan().on || !model().sessions.some(function (x) { return !x.opt && !isDone(x.id); })) return null;
-    var off = offWeeks(), thisMon = isoDay(mondayOf(parseISO(isoDay()))), nextMon = isoDay(addDays(parseISO(thisMon), 7));
+    var off = offWeeks(), t = isoDay(), thisMon = isoDay(mondayOf(parseISO(t))), nextMon = isoDay(addDays(parseISO(thisMon), 7));
     var box = el("div", "weekoff");
     var undo = function (mon, label) {
-      var b = el("button", "linkbtn", "Undo the week off " + label); b.type = "button";
+      var b = el("button", "linkbtn", "Undo: put " + label + " back"); b.type = "button";
       b.addEventListener("click", function () { setWeekOff(mon, false); });
       box.appendChild(b);
     };
     if (off[thisMon]) undo(thisMon, "this week");
     if (off[nextMon]) undo(nextMon, "next week");
-    var mon = !off[thisMon] && !weekBusy(thisMon) ? thisMon : !off[nextMon] && !off[thisMon] ? nextMon : null;
+    // What would move if this week were pushed: workouts not done this week, and any missed ones.
+    var end = isoDay(addDays(parseISO(thisMon), 6));
+    var left = model().sessions.filter(function (x) {
+      if (x.opt || isDone(x.id) || isStarted(x.id)) return false;
+      var d = dateOf(x.id); return d && (d <= end);
+    });
+    var mon = null, lab = "";
+    if (!off[thisMon] && left.length) { mon = thisMon; lab = "this week"; }
+    else if (!off[thisMon] && !off[nextMon]) { mon = nextMon; lab = "next week"; }
     if (mon) {
-      var lab = mon === thisMon ? "this week" : "next week";
-      var b = el("button", "linkbtn", "Need a break? Skip " + lab); b.type = "button";
+      var ask = mon === thisMon ? "Behind? Push " + (left.length === 1 ? "this workout" : "these " + left.length + " workouts") + " to next week" : "Need a break? Skip next week";
+      var b = el("button", "linkbtn", ask); b.type = "button";
       b.addEventListener("click", function () {
         box.innerHTML = "";
-        box.appendChild(el("p", "muted", "No workouts " + lab + " (" + fmtDay(mon) + " to " + fmtDay(isoDay(addDays(parseISO(mon), 6))) + "). Everything after moves a week later."));
+        var msg = mon === thisMon
+          ? "Your " + left.length + " remaining " + (left.length === 1 ? "workout" : "workouts") + " (" + left.map(function (x) { return sessLabel(x).replace(/^Week /, "Wk ") + " " + x.title.split(" · ")[0]; }).join(", ") + ") start again " + fmtDay(nextMon) + ", and the rest of the program follows on your usual days."
+          : "No workouts " + fmtDay(mon) + " to " + fmtDay(isoDay(addDays(parseISO(mon), 6))) + ". Everything after moves a week later.";
+        box.appendChild(el("p", "muted", msg));
         var row = el("div", "btnrow");
         var no = el("button", "btn ghost", "Cancel"); no.type = "button"; no.addEventListener("click", function () { render(); });
-        var yes = el("button", "btn", "Skip " + lab); yes.type = "button"; yes.addEventListener("click", function () { setWeekOff(mon, true); });
+        var yes = el("button", "btn", mon === thisMon ? "Push to next week" : "Skip next week"); yes.type = "button";
+        yes.addEventListener("click", function () { setWeekOff(mon, true); });
         row.appendChild(no); row.appendChild(yes); box.appendChild(row);
       });
       box.appendChild(b);
     }
     return box.childNodes.length ? box : null;
   }
+
 
   function plan() {
     if (PL) return PL;
@@ -1002,12 +1013,23 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
     if (!st || !rule) return PL;
     PL.on = true; PL.start = isoDay(st);
     var ss = model().sessions.filter(function (x) { return !x.opt; }), d = st, k = 0;
-    var off = offWeeks();
-    for (var n = 0; k < ss.length && n < 3650; n++, d = addDays(d, 1)) {
-      var train = rule.days ? rule.days.indexOf(d.getDay()) >= 0 : (n % (rule.on + rule.off)) < rule.on;
-      if (off[isoDay(mondayOf(d))]) train = false;
-      if (train) PL.at[ss[k++].id] = isoDay(d);
-    }
+    var isTrain = function (dd) {
+      var n0 = Math.round((dd - st) / 86400000);
+      return rule.days ? rule.days.indexOf(dd.getDay()) >= 0 : (n0 % (rule.on + rule.off)) < rule.on;
+    };
+    for (var n = 0; k < ss.length && n < 3650; n++, d = addDays(d, 1)) if (isTrain(d)) PL.at[ss[k++].id] = isoDay(d);
+    // A pushed-back week (Mon to Sun) gets no workouts. Every workout not done yet from that week on, plus any
+    // missed ones when it's the current week, goes on the next training days after it, in program order.
+    var off = offWeeks(), t = isoDay();
+    Object.keys(off).sort().forEach(function (mon) {
+      var pend = ss.filter(function (x) {
+        var at = PL.at[x.id];
+        return at && !isDone(x.id) && !isStarted(x.id) && !movedOf(x.id) && (at >= mon || (mon <= t && at < t));
+      });
+      var dd = addDays(parseISO(mon), 7), j = 0;
+      for (var g = 0; j < pend.length && g < 3650; g++, dd = addDays(dd, 1))
+        if (isTrain(dd) && !off[isoDay(mondayOf(dd))]) PL.at[pend[j++].id] = isoDay(dd);
+    });
     return PL;
   }
   function movedOf(id) { var lg = logs[id]; if (lg && "moved" in lg) return lg.moved || ""; remote(); return MV[id] || ""; }
@@ -1844,30 +1866,6 @@ body.kp-open .rest { bottom: var(--kph, 360px); z-index: 36; }
       g1.appendChild(statTile("Volume (lb)", bigNum(all.vol))); g1.appendChild(statTile("Reps", all.reps.toLocaleString("en-US"))); g1.appendChild(statTile("Workouts", String(all.n)));
       c1.appendChild(g1);
       viewEl.appendChild(c1);
-
-      // Estimated 1-rep max (Epley) for the four main lifts, from the best set of each.
-      var best = {};
-      L.forEach(function (x) { x.sets.forEach(function (t) {
-        var lift = liftOf(t.n);
-        if (!lift || !(t.w > 0) || !t.r || t.timed || t.r > 10) return;
-        var e = e1rm(t.w, t.r), cur = best[lift];
-        if (!cur || e > cur.e) best[lift] = { n: t.n, e: e, w: t.w, r: t.r, date: x.date };
-      }); });
-      var bl = LIFTS.filter(function (k) { return best[k]; });
-      if (bl.length) {
-        var c4 = el("section", "card");
-        c4.appendChild(el("h3", null, "Estimated maxes"));
-        c4.appendChild(el("p", "hsub", "Your 1-rep max, estimated from your best set and rounded down to 5."));
-        var ml = el("div");
-        bl.forEach(function (k) {
-          var bb = best[k], r = el("div", "mlrow");
-          r.appendChild(el("span", "n", k));
-          r.appendChild(el("span", "e", Math.floor(bb.e / 5) * 5 + " lb"));
-          ml.appendChild(r);
-        });
-        c4.appendChild(ml);
-        viewEl.appendChild(c4);
-      }
 
       // Workout log: newest first, the day and the workout's name.
       var done = L.filter(function (x) { return x.done; }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
